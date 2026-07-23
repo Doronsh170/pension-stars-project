@@ -22,18 +22,33 @@ CAT_ORDER = [
 ]
 def cshow(c): return c.replace(" | ", " · ")
 
-# ---- pooled persistence ----
-pool={1:[],2:[],3:[]}; topq={1:[],2:[],3:[]}; no1={1:[],2:[],3:[]}; bot={1:[],2:[],3:[]}
-for e in events:
-    for k in (1,2,3):
-        if e.get(f"y{k}_status")!="present": continue
-        rk=int(e[f"y{k}_rank"]); n=int(e[f"y{k}_n"])
-        pool[k].append(float(e[f"y{k}_percentile"]))
-        topq[k].append(100 if rk<=n/4 else 0); no1[k].append(100 if rk==1 else 0)
-        bot[k].append(100 if rk>n/2 else 0)
-def mean(l): return round(statistics.mean(l),1) if l else None
-persist=[{"h":k,"n":len(pool[k]),"pctile":mean(pool[k]),"topq":mean(topq[k]),
-          "no1":mean(no1[k]),"bot":mean(bot[k])} for k in (1,2,3)]
+# ---- horizon statistics (descriptive) ----
+def hstats(k):
+    ranks=[]; ns=[]; pct=[]; normpos=[]; present=absent=total=0
+    still1=top3=topq=half=bot=0
+    for e in events:
+        st=e.get(f"y{k}_status")
+        if st in ("present","absent"): total+=1
+        if st=="absent": absent+=1
+        if st!="present": continue
+        present+=1
+        rk=int(e[f"y{k}_rank"]); n=int(e[f"y{k}_n"]); p=float(e[f"y{k}_percentile"])
+        ranks.append(rk); ns.append(n); pct.append(p); normpos.append(rk/n)
+        if rk==1: still1+=1
+        if rk<=3: top3+=1
+        if rk<=max(1,round(n/4)): topq+=1
+        if rk<=n/2: half+=1
+        else: bot+=1
+    r1=lambda x:round(x,1)
+    return {"h":k,"present":present,"total":total,
+        "med_rank":round(statistics.median(ranks)),"med_n":round(statistics.median(ns)),
+        "med_pos":r1(statistics.median(normpos)*100),
+        "pctile":r1(statistics.mean(pct)),"med_pctile":r1(statistics.median(pct)),
+        "no1":r1(still1/present*100),"top3":r1(top3/present*100),"topq":r1(topq/present*100),
+        "half":r1(half/present*100),"bot":r1(bot/present*100),
+        "vanished":r1(absent/total*100)}
+persist=[hstats(k) for k in (1,2,3)]
+TOTAL_EVENTS=persist[0]["total"]
 
 strat_by={(s["domain"],s["category"]):s for s in strat}
 risk_by={(r["domain"],r["category"]):r for r in risk}
@@ -65,7 +80,7 @@ for d,c in CAT_ORDER:
                  "k1":cellobj(e,1),"k2":cellobj(e,2),"k3":cellobj(e,3)} for e in rows]})
 
 DATA=json.dumps({"persist":persist,"strat":strat_data,"cats":cats,
-                 "pooled_vol":pooled_vol},ensure_ascii=False)
+                 "pooled_vol":pooled_vol,"total":TOTAL_EVENTS},ensure_ascii=False)
 
 HTML = r"""<div id="page" dir="rtl">
 <style>
@@ -118,11 +133,16 @@ h1{font-size:clamp(30px,5.2vw,46px);line-height:1.12;font-weight:800;letter-spac
 .tldr{background:var(--raised);border:1px solid var(--line);border-radius:14px;
   box-shadow:var(--shadow);padding:26px 28px;margin:34px 0 12px;position:relative}
 .tldr::before{content:"";position:absolute;inset-inline-start:0;top:16px;bottom:16px;
-  width:4px;border-radius:4px;background:var(--clay)}
+  width:4px;border-radius:4px;background:var(--teal)}
 .tldr .lab{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
-  color:var(--clay);font-weight:700;margin-bottom:8px}
-.tldr p{margin:0;font-size:18.5px;font-weight:500}
+  color:var(--teal);font-weight:700;margin-bottom:8px}
+.tldr p{margin:0;font-size:18px;font-weight:500}
 .tldr strong{color:var(--ink);font-weight:800}
+.tldr .qn{display:inline-flex;align-items:center;justify-content:center;width:22px;
+  height:22px;border-radius:50%;background:var(--teal);color:#fff;font-size:12.5px;
+  font-weight:800;margin-inline-start:2px;vertical-align:middle}
+.tldr-note{margin-top:14px!important;font-size:14.5px!important;color:var(--muted);
+  font-weight:400!important}
 
 section{padding-top:52px}
 .eyebrow{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);
@@ -184,114 +204,122 @@ tr.closed td{color:var(--faint);font-style:italic}
 </style>
 
 <div class="masthead"><div class="wrap">
-  <div class="kicker">מחקר אמפירי · שוק החיסכון ארוך הטווח</div>
-  <h1>לרדוף אחרי כוכב התשואות של אתמול</h1>
-  <p class="dek">בכל תחילת שנה החוסך רואה מי הובילה אשתקד ומעביר אליה את כספו.
-    בדקנו על 27 שנות נתונים מה קרה באמת לאותן קופות מובילות — והאם המהלך משתלם.</p>
+  <div class="kicker">מחקר תיאורי · שוק החיסכון ארוך הטווח</div>
+  <h1>מה קרה בפועל לקופות שהובילו בתשואה?</h1>
+  <p class="dek">חוסך בוחן בכל תחילת שנה את טבלת התשואות של אשתקד, מזהה את המובילה
+    בקטגוריה שלו ומעביר אליה את כספו. עקבנו אחרי אותן קופות מובילות לאורך ההיסטוריה
+    הזמינה, כדי להציג — באופן אובייקטיבי — כיצד התנהגו בשנים שאחרי.</p>
   <div class="sourceline">
     <span><b>מקור:</b> גמלנט · פנסיהנט (רשות שוק ההון)</span>
     <span><b>תקופה:</b> <span class="num">1999–2025</span> גמל · <span class="num">2011–2025</span> פנסיה</span>
-    <span><b>היקף:</b> <span class="num">9</span> קטגוריות · <span class="num">160</span> אירועי איתות</span>
+    <span><b>היקף:</b> <span class="num">9</span> קטגוריות · <span class="num" id="evCount">177</span> אירועי איתות</span>
   </div>
 </div></div>
 
 <div class="wrap">
   <div class="tldr">
-    <div class="lab">השורה התחתונה</div>
-    <p>מעבר לקופה שהובילה בשנה הקודמת <strong>אינו מייצר יתרון אמין לאורך זמן</strong>.
-      ההובלה נשחקת במהירות, ורוב ה"יתרון" הכספי שנמדד מוסבר בכך שהמנצחת היא כמעט
-      תמיד הקופה <strong>המסוכנת יותר</strong> בקטגוריה — פרמיית סיכון בשוק עולה,
-      לא כישרון שחוזר על עצמו.</p>
+    <div class="lab">שלוש השאלות</div>
+    <p><span class="qn num">1</span> האם קופות שהובילו שומרות על מעמדן בהמשך?
+      <span class="qn num">2</span> מהו הדירוג האופייני של מובילה לאחר שנה, שנתיים ושלוש?
+      <span class="qn num">3</span> האם נמצא יתרון עקבי למעבר אל מובילת אשתקד?</p>
+    <p class="tldr-note">המטרה אינה להוכיח או להפריך מראש את כדאיות המעבר, אלא להציג
+      את הנתונים ההיסטוריים ולאפשר להסיק מהם מסקנות מבוססות עובדות.</p>
   </div>
 
   <section>
-    <div class="eyebrow">ממצא 01 · התמדה</div>
-    <h2>ההובלה מתפוגגת — המנצחת של אשתקד היא הימור, לא ודאות</h2>
-    <p class="body">עקבנו אחרי כל קופה שדורגה ראשונה, אל תוך שלוש השנים שאחרי.
-      אם ל"מקום הראשון" הייתה משמעות מתמשכת, היינו מצפים לראות אותה נשארת בצמרת.
-      במקום זה היא מתכנסת בחזרה אל הממוצע: בשנה שאחרי היא נוחתת סביב האחוזון
-      <span class="emteal">60</span> (מעט מעל הטלת מטבע), ורק כ־<span class="em">12%</span>
-      מהמנצחות חוזרות למקום הראשון — נתון שקורס לכ־<span class="em">3%</span> תוך שלוש שנים.</p>
+    <div class="eyebrow">שאלה 01 · שמירת מעמד</div>
+    <h2>האם המובילות שומרות על מעמדן?</h2>
+    <p class="body">עקבנו אחרי כל קופה שדורגה ראשונה, אל תוך שלוש השנים שאחרי. בשנה
+      שאחרי האיתות <span class="emteal" id="s_no1">12%</span> מהמובילות בלבד חזרו למקום
+      הראשון, וכ־<span id="s_top3">27%</span> נשארו בשלושת הראשונים. במקביל,
+      <span class="em" id="s_bot">38%</span> ירדו כבר לאחר שנה אל המחצית התחתונה של
+      הקטגוריה, וכ־<span class="em" id="s_van">10%</span> כלל לא שרדו כקופה נפרדת (נסגרו
+      או מוזגו). לאורך זמן שיעור החזרה למקום הראשון יורד ושיעור ההיעלמות עולה.</p>
     <div class="figure">
-      <div class="cap">אחוזון הדירוג הממוצע של המנצחת בשנים שאחרי (100 = ראשונה, 50 = אמצע הקטגוריה),
-        לצד שיעור המנצחות ששמרו על המקום הראשון.</div>
-      <svg id="chartPersist" viewBox="0 0 720 300" role="img"
-        aria-label="גרף שחיקת ההובלה לאורך שלוש שנים"></svg>
-      <div class="legend">
-        <span><i class="dot" style="background:var(--teal)"></i> אחוזון דירוג ממוצע</span>
-        <span><i class="dot" style="background:var(--gold)"></i> נשארו מקום ראשון</span>
-        <span><i class="dot" style="background:var(--base)"></i> קו האקראיות (50)</span>
-      </div>
+      <div class="cap">שיעור המובילות שנשארו במקום 1, בשלושת הראשונים, ברבעון העליון,
+        או שירדו למחצית התחתונה / חדלו להתקיים — לאחר 1, 2 ו־3 שנים.</div>
+      <svg id="chartKeep" viewBox="0 0 720 340" role="img"
+        aria-label="שמירת מעמד של המובילות לאורך שלוש שנים"></svg>
     </div>
-    <div class="stats" id="statsPersist"></div>
   </section>
 
   <section>
-    <div class="eyebrow">ממצא 02 · כסף</div>
-    <h2>ה"יתרון" הכספי מרוכז היכן שהסיכון מעורבב</h2>
-    <p class="body">דימינו חוסך ש<span class="emteal">רודף</span> — עובר בכל שנה לקופה
-      שהובילה אשתקד — מול חוסך ש<span class="emteal">נשאר</span> ומחזיק את ממוצע
-      הקטגוריה. הרדיפה אמנם "ניצחה" בכל הקטגוריות, אבל שימו לב <span class="em">היכן</span>
-      הפער גדול: במסלולים <span class="em">הכלליים</span>, שם יושב רוב כספם של החוסכים,
-      הוא זניח — כ־<span class="num">0.15</span> נקודות בלבד לשנה. הפערים הגדולים צצים
-      דווקא בפנסיה ובמסלולי מניות, קטגוריות שבהן טווח הסיכון בין הקופות רחב.</p>
+    <div class="eyebrow">שאלה 02 · דירוג אופייני</div>
+    <h2>מהו הדירוג האופייני לאחר 1, 2, 3 שנים?</h2>
+    <p class="body">מבין הקופות ששרדו, הדירוג האופייני (החציוני) של מובילת אשתקד בשנה
+      שאחרי הוא כ־<span class="emteal" id="s_medrank">מקום 10 מתוך 36</span> — סביב
+      השליש העליון של הקטגוריה, לא סמוך למקום הראשון. האחוזון הממוצע גבוה מ־50 אך הולך
+      ומתכנס אל עבר האמצע ככל שחולף הזמן.</p>
     <div class="figure">
-      <div class="cap">פער התשואה השנתית (CAGR) בין "רודף" ל"נשאר", בנקודות אחוז, לפי קטגוריה.
-        ככל שהעמודה ארוכה יותר — כך גדול יותר ה"יתרון" הנמדד.</div>
+      <div class="cap">אחוזון הדירוג של המובילה בשנים שאחרי (100 = מקום ראשון, 50 = אמצע
+        הקטגוריה), ממוצע וחציון. קו ה־50 מסמן דירוג ממוצע ("ללא יתרון").</div>
+      <svg id="chartPctile" viewBox="0 0 720 300" role="img"
+        aria-label="אחוזון הדירוג של המובילה לאורך שלוש שנים"></svg>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--teal)"></i> אחוזון ממוצע</span>
+        <span><i class="dot" style="background:var(--gold)"></i> אחוזון חציוני</span>
+        <span><i class="dot" style="background:var(--base)"></i> אמצע הקטגוריה (50)</span>
+      </div>
+    </div>
+    <div class="stats" id="statsRank"></div>
+  </section>
+
+  <section>
+    <div class="eyebrow">שאלה 03 · יתרון עקבי</div>
+    <h2>האם נמצא יתרון עקבי?</h2>
+    <p class="body"><b>(א) תוצאה כספית.</b> חוסך ש<span class="emteal">רודף</span> (עובר
+      בכל שנה למובילת אשתקד) מול חוסך ש<span class="emteal">נשאר</span> בממוצע הקטגוריה.
+      ה"רודף" הקדים בכל הקטגוריות, אך גודל הפער אינו אחיד: במסלולים
+      <span class="em">הכלליים</span>, בהם מרוכז רוב כספם של החוסכים, הפער זעום —
+      כ־<span class="num">0.15</span> נקודות לשנה — והפערים הגדולים מופיעים בפנסיה
+      ובמסלולי המניות.</p>
+    <div class="figure">
+      <div class="cap">פער התשואה השנתית (CAGR) בין "רודף" ל"נשאר", בנקודות אחוז, לפי קטגוריה.</div>
       <svg id="chartGap" viewBox="0 0 720 430" role="img"
         aria-label="פער התשואה בין רדיפה להישארות לפי קטגוריה"></svg>
     </div>
-  </section>
-
-  <section>
-    <div class="eyebrow">ממצא 03 · סיכון</div>
-    <h2>המנצחת היא כמעט תמיד הקופה התנודתית יותר</h2>
-    <p class="body">כאן מתפצח הפער. לכל מנצחת בדקנו את מיקומה בתוך הקטגוריה במונחי
-      <span class="emteal">תנודתיות</span> (סטיית תקן). משוקלל על פני הכול, המנצחת יושבת
-      באחוזון <span class="em" id="volInline">67</span> — כלומר מי שרודף אחרי המקום הראשון
-      בוחר שיטתית קופה מסוכנת מהממוצע. בפנסיה זה חד במיוחד: המנצחות הן כמעט תמיד מסלולי
-      מניות או עוקבי <span class="num">S&P 500</span>. בשוק שברובו עלה, הקופה המסוכנת
-      מרוויחה יותר — וכשהשוק מתהפך, היא צונחת לתחתית.</p>
+    <p class="body"><b>(ב) הקשר לסיכון.</b> המובילה יושבת בממוצע באחוזון תנודתיות
+      <span class="emteal" id="volInline">67</span> בתוך הקטגוריה — היא נוטה להיות מהקופות
+      המסוכנות יותר בקבוצתה (בפנסיה: כמעט תמיד מסלולי מניות או עוקבי
+      <span class="num">S&P 500</span>). מאחר שהתקופה כללה בעיקר שנים של עליות, קופות
+      בעלות חשיפה מנייתית גבוהה השיגו בממוצע תשואות גבוהות יותר — כך שהפער הכספי שבסעיף
+      (א) קשור במידה רבה לרמת הסיכון, ולא בהכרח להתמדה של ביצועים.</p>
     <div class="figure">
-      <div class="cap">אחוזון התנודתיות של המנצחת בתוך הקטגוריה (50 = ללא הטיה, 100 = המסוכנת ביותר).
-        כמעט הכול מעל קו ה־50.</div>
+      <div class="cap">אחוזון התנודתיות של המובילה בתוך הקטגוריה (50 = ללא הטיה, 100 = המסוכנת ביותר).</div>
       <svg id="chartRisk" viewBox="0 0 720 400" role="img"
-        aria-label="אחוזון התנודתיות של המנצחות לפי קטגוריה"></svg>
+        aria-label="אחוזון התנודתיות של המובילות לפי קטגוריה"></svg>
     </div>
   </section>
 
   <section>
     <div class="eyebrow">הנתונים המלאים</div>
     <h2>מעקב שנה־אחר־שנה, לפי קטגוריה</h2>
-    <p class="body">לכל שנת איתות: הקופה שהובילה, תשואתה, ומה עלה בגורלה בשלוש השנים
-      שאחרי — התשואה והדירוג (מקום מתוך מספר הקופות בקטגוריה). שימו לב כמה פעמים
-      המקום הראשון הופך תוך שנה למחצית התחתונה.</p>
+    <p class="body">לכל שנת איתות: הקופה שהובילה, תשואתה, והתשואה והדירוג שלה (מקום מתוך
+      מספר הקופות בקטגוריה) בכל אחת משלוש השנים שאחרי.</p>
     <div id="tables"></div>
   </section>
 
   <div class="conc">
-    <h2>מסקנה</h2>
-    <p class="body">שלושת הממצאים מצטרפים לתמונה אחת: <strong>בחירת קופה לפי טבלת
-      התשואות של אשתקד היא רדיפה אחרי העבר, לא השקעה ביתרון עתידי.</strong></p>
+    <h2>תמצית הממצאים</h2>
+    <p class="body">הנתונים ההיסטוריים מצביעים על התמונה הבאה, המוצגת כעובדות:</p>
     <ol>
-      <li><b>ההובלה מתפוגגת.</b> המנצחת מתכנסת חזרה לכיוון הממוצע; רק כ־12% חוזרות
-        למקום הראשון, וכ־40% צונחות למחצית התחתונה.</li>
-      <li><b>הפער הכספי הוא בעיקר סיכון.</b> הרדיפה מובילה שיטתית לקופות תנודתיות
-        יותר; בשוק עולה הן מרוויחות יותר בממוצע. במסלולים הכלליים היתרון מתאדה
-        לכ־0.15 נקודות לשנה.</li>
-      <li><b>הרדיפה מרכזת סיכון.</b> היא כולאת את החוסך בקופה בודדת ומסוכנת, וחושפת
-        אותו לתהפוכות חדות — והכול לפני דמי ניהול, מס ועלויות מעבר שפועלים נגדה.</li>
+      <li><b>שמירת מעמד חלקית וזמנית.</b> רק כ־12% מהמובילות חזרו למקום הראשון בשנה
+        שאחרי, כ־40% ירדו למחצית התחתונה, ובתוך שלוש שנים כרבע מהן נסגרו או מוזגו.</li>
+      <li><b>הדירוג האופייני הוא "טוב מהממוצע", לא "מוביל".</b> מובילת אשתקד מדורגת
+        בשנה שאחרי סביב השליש העליון, והאחוזון הממוצע מתכנס אל עבר האמצע עם הזמן.</li>
+      <li><b>היתרון הכספי אינו אחיד וקשור לסיכון.</b> ה"רודף" הקדים בכל הקטגוריות, אך
+        במסלולים הכלליים הפער זעום (~0.15 נק' לשנה), והפערים הגדולים מופיעים היכן
+        שהמובילה נוטה להיות הקופה המסוכנת יותר — בתקופה של שווקים עולים.</li>
     </ol>
-    <p class="body">עדיף לבחור מסלול ברמת סיכון שמתאימה לגיל ולצרכים, עם דמי ניהול
-      נמוכים, ולהחזיק אותו בעקביות — במקום לקפוץ מדי שנה אל כוכב התשואות של אתמול.</p>
+    <p class="body">הנתונים המלאים והקוד בתיקיית <code>analysis/</code>. לקורא/ת נותרת
+      ההחלטה כיצד לשקלל ממצאים אלה.</p>
   </div>
 
   <div class="foot">
-    כל הנתונים, הקוד והטבלאות בתיקיית <code>analysis/</code>.
     שחזור: <code>build_annual.py</code> → <code>chase_analysis.py</code> →
     <code>risk_check.py</code> → <code>make_report.py</code> / <code>build_html.py</code>.
     תשואה שנתית חושבה משרשור התשואות החודשיות; נכללו רק שנים עם 12 חודשי דיווח.
-    הסימולציה אינה מנכה דמי ניהול, מס ועלויות מעבר — כולם פועלים נגד אסטרטגיית הרדיפה.
+    הסימולציה הכספית אינה מנכה דמי ניהול, מס ועלויות מעבר.
   </div>
 </div>
 
@@ -302,14 +330,63 @@ const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim
 function el(t,a){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;}
 function txt(x,y,s,o={}){const t=el("text",{x,y,...o});t.textContent=s;return t;}
 
-/* ---- persistence chart ---- */
+/* ---- inline figures ---- */
 (function(){
-  const svg=document.getElementById("chartPersist");
+  const p1=D.persist[0];
+  document.getElementById("evCount").textContent=D.total;
+  document.getElementById("s_no1").textContent=Math.round(p1.no1)+"%";
+  document.getElementById("s_top3").textContent=Math.round(p1.top3)+"%";
+  document.getElementById("s_bot").textContent=Math.round(p1.bot)+"%";
+  document.getElementById("s_van").textContent=Math.round(p1.vanished)+"%";
+  document.getElementById("s_medrank").textContent=
+    "מקום "+p1.med_rank+" מתוך ~"+p1.med_n;
+})();
+
+/* ---- Q1: keep-status grouped bars (share %, per horizon) ---- */
+(function(){
+  const svg=document.getElementById("chartKeep");
+  const W=720,H=340,mL=40,mR=16,mT=16,mB=44;
+  const iw=W-mL-mR, ih=H-mT-mB;
+  const groups=[
+    {k:"no1",lab:"מקום 1",col:css("--gold")},
+    {k:"top3",lab:"שלושה ראשונים",col:css("--teal")},
+    {k:"topq",lab:"רבעון עליון",col:css("--teal")},
+    {k:"bot",lab:"מחצית תחתונה",col:css("--clay")},
+    {k:"vanished",lab:"נסגרו/מוזגו",col:css("--base")},
+  ];
+  const y=v=>mT+ih*(1-v/100);
+  [0,25,50,75,100].forEach(g=>{
+    svg.appendChild(el("line",{x1:mL,x2:W-mR,y1:y(g),y2:y(g),stroke:css("--line"),"stroke-width":1}));
+    svg.appendChild(txt(mL-8,y(g)+4,g+"%",{fill:css("--faint"),"font-size":10.5,"text-anchor":"end"}));
+  });
+  const gw=iw/groups.length;
+  groups.forEach((g,gi)=>{
+    const gx=mL+gw*gi, bw=gw*0.2, pad=gw*0.1;
+    D.persist.forEach((d,hi)=>{
+      const v=d[g.k]; const bx=gx+pad+bw*hi+ (gw*0.06)*hi;
+      svg.appendChild(el("rect",{x:bx,y:y(v),width:bw,height:mT+ih-y(v),rx:2.5,
+        fill:g.col,opacity:0.45+0.27*hi}));
+      svg.appendChild(txt(bx+bw/2,y(v)-5,Math.round(v),{fill:g.col,"font-size":10.5,
+        "font-weight":700,"text-anchor":"middle"}));
+    });
+    svg.appendChild(txt(gx+gw/2,H-mB+18,g.lab,{fill:css("--ink"),"font-size":12,
+      "font-weight":600,"text-anchor":"middle"}));
+  });
+  // horizon legend
+  const lx=mL+4; ["+1 שנה","+2 שנים","+3 שנים"].forEach((t,i)=>{
+    const cx=lx+i*92;
+    svg.appendChild(el("rect",{x:cx,y:H-14,width:11,height:11,rx:2,fill:css("--muted"),opacity:0.45+0.27*i}));
+    svg.appendChild(txt(cx+16,H-4,t,{fill:css("--muted"),"font-size":11,"text-anchor":"start"}));
+  });
+})();
+
+/* ---- Q2: percentile line (mean + median) ---- */
+(function(){
+  const svg=document.getElementById("chartPctile");
   const W=720,H=300,mL=44,mR=44,mT=24,mB=52;
   const iw=W-mL-mR, ih=H-mT-mB;
   const xs=D.persist.map((_,i)=>mL+iw*(i+0.5)/D.persist.length);
   const y=v=>mT+ih*(1-v/100);
-  // gridlines
   [0,25,50,75,100].forEach(g=>{
     svg.appendChild(el("line",{x1:mL,x2:W-mR,y1:y(g),y2:y(g),
       stroke:g===50?css("--base"):css("--line"),"stroke-width":g===50?1.5:1,
@@ -317,37 +394,31 @@ function txt(x,y,s,o={}){const t=el("text",{x,y,...o});t.textContent=s;return t;
     svg.appendChild(txt(mL-10,y(g)+4,g,{fill:css("--faint"),"font-size":11,"text-anchor":"end"}));
   });
   svg.appendChild(txt(W-mR+8,y(50)+4,"50",{fill:css("--base"),"font-size":11,"font-weight":700}));
-  // percentile line
-  const pts=D.persist.map((d,i)=>[xs[i],y(d.pctile)]);
-  let path="M"+pts.map(p=>p.join(",")).join(" L");
-  svg.appendChild(el("path",{d:path,fill:"none",stroke:css("--teal"),"stroke-width":3,
-    "stroke-linecap":"round","stroke-linejoin":"round"}));
-  // no1 line
-  const p2=D.persist.map((d,i)=>[xs[i],y(d.no1)]);
-  svg.appendChild(el("path",{d:"M"+p2.map(p=>p.join(",")).join(" L"),fill:"none",
-    stroke:css("--gold"),"stroke-width":2.5,"stroke-dasharray":"2 5","stroke-linecap":"round"}));
+  const line=(key,col,dash)=>{
+    const p=D.persist.map((d,i)=>[xs[i],y(d[key])]);
+    svg.appendChild(el("path",{d:"M"+p.map(q=>q.join(",")).join(" L"),fill:"none",
+      stroke:col,"stroke-width":dash?2.5:3,"stroke-dasharray":dash||"",
+      "stroke-linecap":"round","stroke-linejoin":"round"}));
+  };
+  line("med_pctile",css("--gold"),"2 5");
+  line("pctile",css("--teal"),null);
   D.persist.forEach((d,i)=>{
+    svg.appendChild(el("circle",{cx:xs[i],cy:y(d.med_pctile),r:4,fill:css("--gold")}));
     svg.appendChild(el("circle",{cx:xs[i],cy:y(d.pctile),r:5.5,fill:css("--teal")}));
-    svg.appendChild(txt(xs[i],y(d.pctile)-13,d.pctile,{fill:css("--teal"),"font-size":14,
-      "font-weight":800,"text-anchor":"middle"}));
-    svg.appendChild(el("circle",{cx:xs[i],cy:y(d.no1),r:4,fill:css("--gold")}));
-    svg.appendChild(txt(xs[i],y(d.no1)+20,d.no1+"%",{fill:css("--gold"),"font-size":12,
-      "font-weight":700,"text-anchor":"middle"}));
+    svg.appendChild(txt(xs[i],y(d.pctile)-13,Math.round(d.pctile),{fill:css("--teal"),
+      "font-size":14,"font-weight":800,"text-anchor":"middle"}));
     svg.appendChild(txt(xs[i],H-mB+26,"שנה +"+d.h,{fill:css("--muted"),"font-size":13,
       "font-weight":700,"text-anchor":"middle"}));
   });
 })();
 
-/* stat cards */
+/* stat cards (Q2) */
 (function(){
-  const s=document.getElementById("statsPersist");
-  const p1=D.persist[0];
-  const cards=[
-    ["good",p1.pctile,"אחוזון ממוצע בשנה שאחרי"],
-    ["warn",p1.no1+"%","חזרו למקום הראשון"],
-    ["",p1.topq+"%","נשארו ברבעון העליון"],
-    ["warn",p1.bot+"%","צנחו למחצית התחתונה"],
-  ];
+  const s=document.getElementById("statsRank");
+  const cards=D.persist.map(d=>[
+    "", "מקום "+d.med_rank, "דירוג חציוני לאחר "+d.h+" שנים (מתוך ~"+d.med_n+")"
+  ]);
+  cards.push(["good",Math.round(D.persist[0].pctile),"אחוזון ממוצע בשנה שאחרי"]);
   cards.forEach(([c,v,l])=>{
     const d=document.createElement("div");d.className="stat";
     d.innerHTML=`<div class="v ${c}"><span class="num">${v}</span></div><div class="l">${l}</div>`;
