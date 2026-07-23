@@ -12,15 +12,22 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 def read(n): return list(csv.DictReader(open(os.path.join(HERE, n), encoding="utf-8-sig")))
 events = read("events.csv"); strat = read("strategy_summary.csv"); risk = read("risk_summary.csv")
 
-DOM_HE = {"gemel": "גמל", "pension": "פנסיה"}
 CAT_ORDER = [
-    ("gemel", 'קרנות השתלמות | כללי'), ("gemel", 'תגמולים ואישית לפיצויים | כללי'),
-    ("gemel", 'מרכזית לפיצויים | כללי'), ("gemel", 'קרנות השתלמות | מניות'),
-    ("gemel", 'תגמולים ואישית לפיצויים | מניות'), ("gemel", 'קרנות השתלמות | אג"ח'),
-    ("gemel", 'תגמולים ואישית לפיצויים | אג"ח'), ("pension", 'קרנות חדשות'),
-    ("pension", 'קרנות כלליות'),
+    ("gemel", 'קרנות השתלמות | כללי'), ("gemel", 'קרנות השתלמות | מניות'),
+    ("gemel", 'קרנות השתלמות | אג"ח'),
+    ("gemel", 'תגמולים ואישית לפיצויים | כללי'),
+    ("gemel", 'תגמולים ואישית לפיצויים | מניות'),
+    ("gemel", 'תגמולים ואישית לפיצויים | אג"ח'),
+    ("pension", 'קרנות חדשות'), ("pension", 'קרנות כלליות'),
 ]
-def cshow(c): return c.replace(" | ", " · ")
+def family(c):
+    if c.startswith("קרנות השתלמות"): return "קרן השתלמות"
+    if c.startswith("תגמולים"): return "קופת גמל"
+    return "קרן פנסיה"
+def label(c):
+    if c.startswith("קרנות השתלמות") or c.startswith("תגמולים"):
+        return family(c) + " · " + c.split(" | ")[1]
+    return "קרן פנסיה · " + c
 
 # ---- horizon statistics (descriptive) ----
 def hstats(k):
@@ -52,7 +59,7 @@ TOTAL_EVENTS=persist[0]["total"]
 
 strat_by={(s["domain"],s["category"]):s for s in strat}
 risk_by={(r["domain"],r["category"]):r for r in risk}
-strat_data=[{"label":f"{DOM_HE[d]} · {cshow(c)}","dom":d,
+strat_data=[{"label":label(c),"dom":d,"fam":family(c),
              "chase":float(strat_by[(d,c)]["chase_annualized_pct"]),
              "stay":float(strat_by[(d,c)]["stay_annualized_pct"]),
              "gap":float(strat_by[(d,c)]["gap_annualized_pp"]),
@@ -74,13 +81,18 @@ cats=[]
 for d,c in CAT_ORDER:
     rows=sorted(ev_by.get((d,c),[]),key=lambda x:int(x["signal_year"]))
     if not rows: continue
-    cats.append({"label":f"{DOM_HE[d]} · {cshow(c)}","dom":d,
+    cats.append({"label":label(c),"dom":d,"fam":family(c),
         "rows":[{"y":int(e["signal_year"]),"name":e["winner_name"],
                  "sret":float(e["signal_return"]),"sn":int(e["signal_n"]),
                  "k1":cellobj(e,1),"k2":cellobj(e,2),"k3":cellobj(e,3)} for e in rows]})
 
 DATA=json.dumps({"persist":persist,"strat":strat_data,"cats":cats,
                  "pooled_vol":pooled_vol,"total":TOTAL_EVENTS},ensure_ascii=False)
+
+def _gap(cat):
+    s = strat_by.get(("gemel", cat)) or strat_by.get(("pension", cat))
+    return f'{float(s["gap_annualized_pp"]):+.2f}'.replace("-", "−") if s else "—"
+SG = _gap('קרנות השתלמות | כללי'); PG = _gap('תגמולים ואישית לפיצויים | כללי')
 
 HTML = r"""<div id="page" dir="rtl">
 <style>
@@ -171,6 +183,10 @@ p.body{color:var(--ink);margin:16px 0}
 @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
 
 /* tables */
+.famhead{margin:26px 0 6px;font-size:15px;font-weight:800;color:var(--teal);
+  letter-spacing:.02em;display:flex;align-items:center;gap:8px}
+.famhead .diamond{font-size:11px;opacity:.8}
+.famhead:first-child{margin-top:6px}
 details{background:var(--raised);border:1px solid var(--line);border-radius:12px;
   margin:12px 0;overflow:hidden}
 summary{cursor:pointer;padding:15px 20px;font-weight:700;font-size:16px;list-style:none;
@@ -207,12 +223,12 @@ tr.closed td{color:var(--faint);font-style:italic}
   <div class="kicker">מחקר תיאורי · שוק החיסכון ארוך הטווח</div>
   <h1>מה קרה בפועל לקופות שהובילו בתשואה?</h1>
   <p class="dek">חוסך בוחן בכל תחילת שנה את טבלת התשואות של אשתקד, מזהה את המובילה
-    בקטגוריה שלו ומעביר אליה את כספו. עקבנו אחרי אותן קופות מובילות לאורך ההיסטוריה
-    הזמינה, כדי להציג — באופן אובייקטיבי — כיצד התנהגו בשנים שאחרי.</p>
+    בקטגוריה שלו ומעביר אליה את כספו. עקבנו אחרי אותן קופות מובילות — בהפרדה בין
+    קרן השתלמות, קופת גמל וקרן פנסיה — כדי להציג באופן אובייקטיבי כיצד התנהגו בשנים שאחרי.</p>
   <div class="sourceline">
     <span><b>מקור:</b> גמלנט · פנסיהנט (רשות שוק ההון)</span>
-    <span><b>תקופה:</b> <span class="num">1999–2025</span> גמל · <span class="num">2011–2025</span> פנסיה</span>
-    <span><b>היקף:</b> <span class="num">9</span> קטגוריות · <span class="num" id="evCount">177</span> אירועי איתות</span>
+    <span><b>תקופה:</b> שנות איתות <span class="num">2010–2024</span> · מעקב עד <span class="num">2025</span></span>
+    <span><b>היקף:</b> <span class="num">8</span> קטגוריות · <span class="num" id="evCount">104</span> אירועי איתות</span>
   </div>
 </div></div>
 
@@ -269,10 +285,10 @@ tr.closed td{color:var(--faint);font-style:italic}
     <h2>האם נמצא יתרון עקבי?</h2>
     <p class="body"><b>(א) תוצאה כספית.</b> חוסך ש<span class="emteal">רודף</span> (עובר
       בכל שנה למובילת אשתקד) מול חוסך ש<span class="emteal">נשאר</span> בממוצע הקטגוריה.
-      ה"רודף" הקדים בכל הקטגוריות, אך גודל הפער אינו אחיד: במסלולים
-      <span class="em">הכלליים</span>, בהם מרוכז רוב כספם של החוסכים, הפער זעום —
-      כ־<span class="num">0.15</span> נקודות לשנה — והפערים הגדולים מופיעים בפנסיה
-      ובמסלולי המניות.</p>
+      גודל הפער אינו אחיד: במסלולים <span class="em">הכלליים</span>, בהם מרוכז רוב
+      כספם של החוסכים, הפער זעום ואף שלילי — כ־<span class="num">__SG__</span> נק' בקרן
+      השתלמות כללי אך <span class="num">__PG__</span> נק' בקופת גמל כללי — והפערים
+      הגדולים מופיעים במסלולי המניות ובקרנות הפנסיה.</p>
     <div class="figure">
       <div class="cap">פער התשואה השנתית (CAGR) בין "רודף" ל"נשאר", בנקודות אחוז, לפי קטגוריה.</div>
       <svg id="chartGap" viewBox="0 0 720 430" role="img"
@@ -307,9 +323,11 @@ tr.closed td{color:var(--faint);font-style:italic}
         שאחרי, כ־40% ירדו למחצית התחתונה, ובתוך שלוש שנים כרבע מהן נסגרו או מוזגו.</li>
       <li><b>הדירוג האופייני הוא "טוב מהממוצע", לא "מוביל".</b> מובילת אשתקד מדורגת
         בשנה שאחרי סביב השליש העליון, והאחוזון הממוצע מתכנס אל עבר האמצע עם הזמן.</li>
-      <li><b>היתרון הכספי אינו אחיד וקשור לסיכון.</b> ה"רודף" הקדים בכל הקטגוריות, אך
-        במסלולים הכלליים הפער זעום (~0.15 נק' לשנה), והפערים הגדולים מופיעים היכן
-        שהמובילה נוטה להיות הקופה המסוכנת יותר — בתקופה של שווקים עולים.</li>
+      <li><b>היתרון הכספי אינו אחיד וקשור לסיכון.</b> במסלולים הכלליים הפער זעום ואף
+        שלילי (קרן השתלמות כללי <span class="num">__SG__</span> נק', קופת גמל כללי
+        <span class="num">__PG__</span> נק' לשנה), והפערים הגדולים מופיעים במסלולי
+        המניות ובקרנות הפנסיה — היכן שהמובילה נוטה להיות הקופה המסוכנת יותר,
+        בתקופה של שווקים עולים.</li>
     </ol>
     <p class="body">הנתונים המלאים והקוד בתיקיית <code>analysis/</code>. לקורא/ת נותרת
       ההחלטה כיצד לשקלל ממצאים אלה.</p>
@@ -426,28 +444,35 @@ function txt(x,y,s,o={}){const t=el("text",{x,y,...o});t.textContent=s;return t;
   });
 })();
 
-/* ---- gap chart (horizontal bars, RTL) ---- */
+/* ---- gap chart (natural RTL: labels on right, bars grow left) ---- */
 (function(){
   const svg=document.getElementById("chartGap");
-  const W=720,H=430,mT=10,mB=28,rowH=(H-mT-mB)/D.strat.length;
+  const W=720,H=430,mT=14,mB=30,rowH=(H-mT-mB)/D.strat.length;
   const maxGap=Math.max(...D.strat.map(d=>d.gap));
-  const x0=250, iw=W-x0-70;             // bars grow leftward (RTL)
-  const x=v=>x0 - iw*(v/(maxGap*1.08)); // more gap -> further left
+  const xLab=W-10;                       // labels anchored at far right
+  const x0=250;                          // baseline (0), right side of bars
+  const iw=x0-55;                        // positive bars grow leftward
+  const scale=iw/(maxGap*1.08);
   D.strat.forEach((d,i)=>{
-    const cy=mT+rowH*i, bh=Math.min(24,rowH*0.56), by=cy+(rowH-bh)/2;
-    const isGen=d.label.includes("כללי");
-    const col=isGen?css("--base"):(d.dom==="pension"?css("--clay"):css("--gold"));
-    svg.appendChild(txt(x0+12,by+bh/2+5,d.label,{fill:css("--ink"),"font-size":13,
-      "font-weight":isGen?500:600,"text-anchor":"start"}));
-    svg.appendChild(el("rect",{x:x(d.gap),y:by,width:x0-x(d.gap),height:bh,rx:4,fill:col,
-      opacity:isGen?0.55:0.92}));
-    svg.appendChild(txt(x(d.gap)-8,by+bh/2+5,"+"+d.gap.toFixed(2),{fill:col,"font-size":13,
-      "font-weight":800,"text-anchor":"end"}));
+    const cy=mT+rowH*i, bh=Math.min(24,rowH*0.54), by=cy+(rowH-bh)/2;
+    const isGen=d.label.endsWith("כללי");
+    const neg=d.gap<0;
+    const col=neg?css("--clay"):(isGen?css("--base"):(d.dom==="pension"?css("--clay"):css("--gold")));
+    const span=Math.abs(d.gap)*scale;
+    svg.appendChild(txt(xLab,by+bh/2+5,d.label,{fill:css("--ink"),"font-size":13,
+      "font-weight":isGen?500:600,"text-anchor":"start"}));  // rtl: right edge at xLab
+    const bx=neg?x0:x0-span;
+    svg.appendChild(el("rect",{x:bx,y:by,width:Math.max(1,span),height:bh,rx:4,fill:col,
+      opacity:isGen&&!neg?0.6:0.92}));
+    const lx=neg?x0+span+7:x0-span-7;
+    svg.appendChild(txt(lx,by+bh/2+5,(d.gap>=0?"+":"−")+Math.abs(d.gap).toFixed(2),
+      {fill:col,"font-size":13,"font-weight":800,"text-anchor":neg?"start":"end",
+       style:"direction:ltr"}));
   });
-  // baseline
   svg.appendChild(el("line",{x1:x0,x2:x0,y1:mT,y2:H-mB,stroke:css("--ink"),"stroke-width":1.5}));
-  svg.appendChild(txt(x0,H-mB+18,"0 נק'",{fill:css("--muted"),"font-size":12,"text-anchor":"middle","font-weight":700}));
-  svg.appendChild(txt(x(maxGap),H-mB+18,"פער שנתי (נק' אחוז) ⟵",{fill:css("--faint"),"font-size":11.5,"text-anchor":"start"}));
+  svg.appendChild(txt(x0,H-mB+18,"0",{fill:css("--muted"),"font-size":12,"text-anchor":"middle","font-weight":700}));
+  svg.appendChild(txt(x0-iw,H-mB+18,"פער שנתי (נק' אחוז)",{fill:css("--faint"),
+    "font-size":11.5,"text-anchor":"start",style:"direction:rtl"}));
 })();
 
 /* ---- risk chart (lollipop around 50) ---- */
@@ -490,13 +515,20 @@ document.getElementById("volInline").textContent=Math.round(D.pooled_vol);
     return `<span class="pill ${dir}">${c.ret>=0?'+':''}${c.ret.toFixed(1)}%</span>`
       +` <span class="rk num">${c.rank}/${c.n}</span> ${b}`;
   }
+  let lastFam=null;
   D.cats.forEach((cat,idx)=>{
-    const det=document.createElement("details"); if(idx<2)det.open=true;
+    if(cat.fam!==lastFam){
+      const h=document.createElement("div"); h.className="famhead";
+      h.innerHTML=`<span class="diamond">◆</span> ${cat.fam}`;
+      wrap.appendChild(h); lastFam=cat.fam;
+    }
+    const det=document.createElement("details"); if(idx<3)det.open=true;
+    const track=cat.label.split(" · ").slice(1).join(" · ");
     let rows=cat.rows.map(r=>`<tr><td class="y num">${r.y}</td>
       <td class="name">${r.name}</td>
       <td class="num" style="font-weight:700">+${r.sret.toFixed(1)}%</td>
       <td>${cell(r.k1)}</td><td>${cell(r.k2)}</td><td>${cell(r.k3)}</td></tr>`).join("");
-    det.innerHTML=`<summary><span>${cat.label}</span>
+    det.innerHTML=`<summary><span>${track||cat.label}</span>
       <span class="chev">▸</span></summary>
       <div class="tbl-scroll"><table>
       <thead><tr><th>שנת איתות</th><th>הקופה שנבחרה</th><th>תשואת האיתות</th>
@@ -509,5 +541,5 @@ document.getElementById("volInline").textContent=Math.round(D.pooled_vol);
 </div>"""
 
 open(os.path.join(HERE, "report.html"), "w", encoding="utf-8").write(
-    HTML.replace("__DATA__", DATA))
+    HTML.replace("__DATA__", DATA).replace("__SG__", SG).replace("__PG__", PG))
 print("wrote report.html")

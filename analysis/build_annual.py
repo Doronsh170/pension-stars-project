@@ -57,9 +57,16 @@ def load_rows():
             per = str(per)
             if len(per) < 6:
                 continue
+            name = norm(r[c_name])
+            # Exclude self-managed / IRA wrappers ("בניהול אישי"). These are legal
+            # shells for member-directed portfolios with no pooled fund yield; they
+            # report placeholder ~0% returns that wrongly top the ranking in down
+            # years, so they are not comparable investment products for this study.
+            if name and ("בניהול אישי" in name or "IRA" in name):
+                continue
             year = int(per[:4]); month = int(per[4:6])
             spec = norm(r[c_spec]) if c_spec is not None else None
-            yield (domain, r[c_id], norm(r[c_name]), norm(r[c_cls]), spec,
+            yield (domain, r[c_id], name, norm(r[c_cls]), spec,
                    year, month, r[c_my])
         wb.close()
 

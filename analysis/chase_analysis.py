@@ -28,19 +28,22 @@ IN = os.path.join(HERE, "annual_returns.csv")
 MIN_FUNDS = 8      # a category needs at least this many complete funds in a year
                    # for a "#1" ranking to be meaningful
 HORIZONS = (1, 2, 3)
+FIRST_YEAR = 2010           # study focuses on signal years from 2010 onward
 LAST_COMPLETE_YEAR = 2025   # 2026 is only a partial year in the raw data
 
-# Categories we study. Restricting to these keeps the peer universe stable
-# across the whole history and comparable (like-with-like investment mandates).
+# Categories we study, grouped into three product families that a saver
+# actually chooses between. Provident (קופת גמל) and study (קרן השתלמות) are
+# kept strictly separate. Within each we compare like-with-like tracks.
 CATEGORIES = {
     "pension": ["קרנות חדשות", "קרנות כלליות"],
     "gemel": [
+        # קרן השתלמות
         'קרנות השתלמות | כללי',
-        'תגמולים ואישית לפיצויים | כללי',
-        'מרכזית לפיצויים | כללי',
         'קרנות השתלמות | מניות',
-        'תגמולים ואישית לפיצויים | מניות',
         'קרנות השתלמות | אג"ח',
+        # קופת גמל (תגמולים ואישית לפיצויים)
+        'תגמולים ואישית לפיצויים | כללי',
+        'תגמולים ואישית לפיצויים | מניות',
         'תגמולים ואישית לפיצויים | אג"ח',
     ],
 }
@@ -54,7 +57,7 @@ def load():
         if int(r["n_months"]) != 12:
             continue
         y = int(r["year"])
-        if y > LAST_COMPLETE_YEAR:
+        if y < FIRST_YEAR or y > LAST_COMPLETE_YEAR:
             continue
         key = (r["domain"], r["category"])
         data[key].setdefault(y, []).append(
