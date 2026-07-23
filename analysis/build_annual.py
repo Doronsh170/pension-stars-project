@@ -35,6 +35,34 @@ def norm(s):
     return " ".join(str(s).split()).strip()
 
 
+# Pension has no track column, so the investment track is parsed from the fund
+# name into the three main tracks (equity / general / bonds). Anything that is
+# not one of these three (halacha, money-market, target-date, retiree, ESG,
+# narrow index sleeves) returns None and is dropped. Bonds are matched before
+# equity so a bond-dominant "אג\"ח עד 25% מניות" track maps to bonds.
+_PEN_EXCLUDE = ["הלכ", "שריע", "כהלכה", "קצב", "פנסיונר", "מקבלי", "זכאים",
+                "בסיסי למקבל", "קיימות", 'חו"ל', "כספי", "שקלי", "יעד לפריש",
+                "ילידי", "יהלום", "עוקב מדדים גמיש", "גמיש", "מסלול יעד", "ריבית",
+                "ליבור", 'מק"מ', "תל בונד", "ממשלתי צמוד", "barclays", "iboxx",
+                "msci", "j.p", "emerging", "treasur", "יורוסטוקס", "נאסד"]
+
+def pension_track(name):
+    if not name:
+        return None
+    n = name.replace("’", "'").lower()
+    for e in _PEN_EXCLUDE:
+        if e in n:
+            return None
+    if 'אג"ח' in n or "אגח" in n or "אשראי ואג" in n:
+        return 'אג"ח'
+    if ("מני" in n or "s1;p" in n or "s&p" in n or "עוקב מדד s" in n
+            or "מחקה מדד s" in n or "אפיק מני" in n or 'ת"א' in n):
+        return "מניות"
+    if "כללי" in n or "משולב" in n or "50 ומטה" in n:  # general / under-50 default
+        return "כללי"
+    return None
+
+
 def load_rows():
     """Yield (domain, fund_id, fund_name, classification, specialization, year, month, monthly_yield)."""
     for fname, sheet, domain in SOURCES:
@@ -83,12 +111,21 @@ def main():
         if my is not None:
             d["months"][month] = float(my)
 
+    # "Survivors only": keep funds that still exist at the end of the window,
+    # i.e. have a complete (12-month) year in SURVIVOR_YEAR. This drops funds
+    # that closed or merged (the study focuses on funds that did not close).
+    SURVIVOR_YEAR = 2025
+    survivors = {(domain, fid) for (domain, fid, year), d in acc.items()
+                 if year == SURVIVOR_YEAR and len(d["months"]) == 12}
+
     out_path = os.path.join(HERE, "annual_returns.csv")
     with open(out_path, "w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
         w.writerow(["domain", "fund_id", "fund_name", "classification",
                     "specialization", "category", "year", "annual_return", "n_months"])
         for (domain, fid, year), d in sorted(acc.items(), key=lambda x: (x[0][0], x[0][2], x[0][1])):
+            if (domain, fid) not in survivors:
+                continue
             months = d["months"]
             n = len(months)
             if n == 0:
@@ -98,12 +135,19 @@ def main():
                 if m in months:
                     comp *= (1 + months[m] / 100.0)
             annual = (comp - 1) * 100.0
-            # category: pension -> classification; gemel -> classification | specialization
+            # category / track:
+            #   pension -> "קרן פנסיה | <track>" parsed from the name (None dropped)
+            #   gemel   -> "classification | specialization"
             if domain == "pension":
-                category = d["cls"]
+                track = pension_track(d["name"])
+                if track is None:
+                    continue
+                spec = track
+                category = f"קרן פנסיה | {track}"
             else:
+                spec = d["spec"]
                 category = d["cls"] if not d["spec"] else f'{d["cls"]} | {d["spec"]}'
-            w.writerow([domain, fid, d["name"], d["cls"], d["spec"], category,
+            w.writerow([domain, fid, d["name"], d["cls"], spec, category,
                         year, round(annual, 4), n])
     print("wrote", out_path)
 

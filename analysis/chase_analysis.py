@@ -35,7 +35,11 @@ LAST_COMPLETE_YEAR = 2025   # 2026 is only a partial year in the raw data
 # actually chooses between. Provident (קופת גמל) and study (קרן השתלמות) are
 # kept strictly separate. Within each we compare like-with-like tracks.
 CATEGORIES = {
-    "pension": ["קרנות חדשות", "קרנות כלליות"],
+    "pension": [
+        'קרן פנסיה | מניות',
+        'קרן פנסיה | כללי',
+        'קרן פנסיה | אג"ח',
+    ],
     "gemel": [
         # קרן השתלמות
         'קרנות השתלמות | כללי',

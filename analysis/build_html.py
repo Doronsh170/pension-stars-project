@@ -18,16 +18,16 @@ CAT_ORDER = [
     ("gemel", 'תגמולים ואישית לפיצויים | כללי'),
     ("gemel", 'תגמולים ואישית לפיצויים | מניות'),
     ("gemel", 'תגמולים ואישית לפיצויים | אג"ח'),
-    ("pension", 'קרנות חדשות'), ("pension", 'קרנות כלליות'),
+    ("pension", 'קרן פנסיה | מניות'), ("pension", 'קרן פנסיה | כללי'),
+    ("pension", 'קרן פנסיה | אג"ח'),
 ]
 def family(c):
     if c.startswith("קרנות השתלמות"): return "קרן השתלמות"
     if c.startswith("תגמולים"): return "קופת גמל"
     return "קרן פנסיה"
 def label(c):
-    if c.startswith("קרנות השתלמות") or c.startswith("תגמולים"):
-        return family(c) + " · " + c.split(" | ")[1]
-    return "קרן פנסיה · " + c
+    parts = c.split(" | ")
+    return family(c) + " · " + (parts[1] if len(parts) > 1 else parts[0])
 
 # ---- horizon statistics (descriptive) ----
 def hstats(k):
@@ -93,6 +93,7 @@ def _gap(cat):
     s = strat_by.get(("gemel", cat)) or strat_by.get(("pension", cat))
     return f'{float(s["gap_annualized_pp"]):+.2f}'.replace("-", "−") if s else "—"
 SG = _gap('קרנות השתלמות | כללי'); PG = _gap('תגמולים ואישית לפיצויים | כללי')
+PE = _gap('קרן פנסיה | מניות')
 
 HTML = r"""<div id="page" dir="rtl">
 <style>
@@ -223,12 +224,13 @@ tr.closed td{color:var(--faint);font-style:italic}
   <div class="kicker">מחקר תיאורי · שוק החיסכון ארוך הטווח</div>
   <h1>מה קרה בפועל לקופות שהובילו בתשואה?</h1>
   <p class="dek">חוסך בוחן בכל תחילת שנה את טבלת התשואות של אשתקד, מזהה את המובילה
-    בקטגוריה שלו ומעביר אליה את כספו. עקבנו אחרי אותן קופות מובילות — בהפרדה בין
-    קרן השתלמות, קופת גמל וקרן פנסיה — כדי להציג באופן אובייקטיבי כיצד התנהגו בשנים שאחרי.</p>
+    בקטגוריה שלו ומעביר אליה את כספו. עקבנו אחרי אותן קופות מובילות — במסלולים
+    העיקריים (מניות/כללי/אג"ח), בהפרדה בין קרן השתלמות, קופת גמל וקרן פנסיה, ורק
+    בקופות ששרדו — כדי להציג באופן אובייקטיבי כיצד התנהגו בשנים שאחרי.</p>
   <div class="sourceline">
     <span><b>מקור:</b> גמלנט · פנסיהנט (רשות שוק ההון)</span>
     <span><b>תקופה:</b> שנות איתות <span class="num">2010–2024</span> · מעקב עד <span class="num">2025</span></span>
-    <span><b>היקף:</b> <span class="num">8</span> קטגוריות · <span class="num" id="evCount">104</span> אירועי איתות</span>
+    <span><b>היקף:</b> <span class="num">5</span> קטגוריות · <span class="num" id="evCount">61</span> אירועי איתות</span>
   </div>
 </div></div>
 
@@ -245,15 +247,15 @@ tr.closed td{color:var(--faint);font-style:italic}
   <section>
     <div class="eyebrow">שאלה 01 · שמירת מעמד</div>
     <h2>האם המובילות שומרות על מעמדן?</h2>
-    <p class="body">עקבנו אחרי כל קופה שדורגה ראשונה, אל תוך שלוש השנים שאחרי. בשנה
-      שאחרי האיתות <span class="emteal" id="s_no1">12%</span> מהמובילות בלבד חזרו למקום
-      הראשון, וכ־<span id="s_top3">27%</span> נשארו בשלושת הראשונים. במקביל,
-      <span class="em" id="s_bot">38%</span> ירדו כבר לאחר שנה אל המחצית התחתונה של
-      הקטגוריה, וכ־<span class="em" id="s_van">10%</span> כלל לא שרדו כקופה נפרדת (נסגרו
-      או מוזגו). לאורך זמן שיעור החזרה למקום הראשון יורד ושיעור ההיעלמות עולה.</p>
+    <p class="body">עקבנו אחרי כל קופה שדורגה ראשונה, אל תוך שלוש השנים שאחרי — וזאת
+      בקרב קופות ששרדו את כל התקופה בלבד. בשנה שאחרי האיתות
+      <span class="emteal" id="s_no1">18%</span> מהמובילות בלבד חזרו למקום הראשון,
+      וכ־<span id="s_top3">38%</span> נשארו בשלושת הראשונים. במקביל,
+      <span class="em" id="s_bot">36%</span> ירדו כבר לאחר שנה אל המחצית התחתונה של
+      הקטגוריה. שמירת המקום הראשון אינה יציבה ואינה עולה עם הזמן.</p>
     <div class="figure">
       <div class="cap">שיעור המובילות שנשארו במקום 1, בשלושת הראשונים, ברבעון העליון,
-        או שירדו למחצית התחתונה / חדלו להתקיים — לאחר 1, 2 ו־3 שנים.</div>
+        או שירדו למחצית התחתונה — לאחר 1, 2 ו־3 שנים.</div>
       <svg id="chartKeep" viewBox="0 0 720 340" role="img"
         aria-label="שמירת מעמד של המובילות לאורך שלוש שנים"></svg>
     </div>
@@ -285,21 +287,21 @@ tr.closed td{color:var(--faint);font-style:italic}
     <h2>האם נמצא יתרון עקבי?</h2>
     <p class="body"><b>(א) תוצאה כספית.</b> חוסך ש<span class="emteal">רודף</span> (עובר
       בכל שנה למובילת אשתקד) מול חוסך ש<span class="emteal">נשאר</span> בממוצע הקטגוריה.
-      גודל הפער אינו אחיד: במסלולים <span class="em">הכלליים</span>, בהם מרוכז רוב
-      כספם של החוסכים, הפער זעום ואף שלילי — כ־<span class="num">__SG__</span> נק' בקרן
-      השתלמות כללי אך <span class="num">__PG__</span> נק' בקופת גמל כללי — והפערים
-      הגדולים מופיעים במסלולי המניות ובקרנות הפנסיה.</p>
+      התמונה מעורבת: במסלולים <span class="em">הכלליים</span> של גמל והשתלמות הפער זעום
+      (כ־<span class="num">__SG__</span> ו־<span class="num">__PG__</span> נק' לשנה);
+      בקרן פנסיה הוא גדול במסלול הכללי אך <span class="em">שלילי במסלול המניות</span>
+      (<span class="num">__PE__</span> נק') — שם הרדיפה דווקא הזיקה, והמובילה נטתה
+      לפגר בשנה שאחרי.</p>
     <div class="figure">
       <div class="cap">פער התשואה השנתית (CAGR) בין "רודף" ל"נשאר", בנקודות אחוז, לפי קטגוריה.</div>
       <svg id="chartGap" viewBox="0 0 720 430" role="img"
         aria-label="פער התשואה בין רדיפה להישארות לפי קטגוריה"></svg>
     </div>
-    <p class="body"><b>(ב) הקשר לסיכון.</b> המובילה יושבת בממוצע באחוזון תנודתיות
-      <span class="emteal" id="volInline">67</span> בתוך הקטגוריה — היא נוטה להיות מהקופות
-      המסוכנות יותר בקבוצתה (בפנסיה: כמעט תמיד מסלולי מניות או עוקבי
-      <span class="num">S&P 500</span>). מאחר שהתקופה כללה בעיקר שנים של עליות, קופות
-      בעלות חשיפה מנייתית גבוהה השיגו בממוצע תשואות גבוהות יותר — כך שהפער הכספי שבסעיף
-      (א) קשור במידה רבה לרמת הסיכון, ולא בהכרח להתמדה של ביצועים.</p>
+    <p class="body"><b>(ב) הקשר לסיכון.</b> גם בתוך מסלול הומוגני, המובילה נוטה לשבת
+      מעט גבוה יותר בסולם התנודתיות (אחוזון ~<span class="emteal" id="volInline">66</span>) —
+      כלומר הקופה האגרסיבית יותר בקבוצה. בתקופה שברובה עלתה, זה הניב לעיתים תשואת־יתר,
+      אך לא באופן עקבי: במסלול המניות של הפנסיה המובילה דווקא פיגרה. כך שהפער — היכן
+      שהוא חיובי — משקף במידה רבה רמת סיכון ותזמון שוק, ולא בהכרח התמדת ביצועים.</p>
     <div class="figure">
       <div class="cap">אחוזון התנודתיות של המובילה בתוך הקטגוריה (50 = ללא הטיה, 100 = המסוכנת ביותר).</div>
       <svg id="chartRisk" viewBox="0 0 720 400" role="img"
@@ -319,25 +321,28 @@ tr.closed td{color:var(--faint);font-style:italic}
     <h2>תמצית הממצאים</h2>
     <p class="body">הנתונים ההיסטוריים מצביעים על התמונה הבאה, המוצגת כעובדות:</p>
     <ol>
-      <li><b>שמירת מעמד חלקית וזמנית.</b> רק כ־12% מהמובילות חזרו למקום הראשון בשנה
-        שאחרי, כ־40% ירדו למחצית התחתונה, ובתוך שלוש שנים כרבע מהן נסגרו או מוזגו.</li>
+      <li><b>שמירת מעמד חלקית וזמנית.</b> רק כ־<span class="num">18%</span> מהמובילות
+        חזרו למקום הראשון בשנה שאחרי, וכ־<span class="num">36%</span> ירדו למחצית
+        התחתונה — וזאת בקרב קופות ששרדו את כל התקופה בלבד.</li>
       <li><b>הדירוג האופייני הוא "טוב מהממוצע", לא "מוביל".</b> מובילת אשתקד מדורגת
         בשנה שאחרי סביב השליש העליון, והאחוזון הממוצע מתכנס אל עבר האמצע עם הזמן.</li>
-      <li><b>היתרון הכספי אינו אחיד וקשור לסיכון.</b> במסלולים הכלליים הפער זעום ואף
-        שלילי (קרן השתלמות כללי <span class="num">__SG__</span> נק', קופת גמל כללי
-        <span class="num">__PG__</span> נק' לשנה), והפערים הגדולים מופיעים במסלולי
-        המניות ובקרנות הפנסיה — היכן שהמובילה נוטה להיות הקופה המסוכנת יותר,
-        בתקופה של שווקים עולים.</li>
+      <li><b>היתרון הכספי אינו אחיד — ולעיתים שלילי.</b> במסלולים הכלליים הפער זעום
+        (קרן השתלמות <span class="num">__SG__</span>, קופת גמל <span class="num">__PG__</span>
+        נק'); בפנסיה הוא גדול במסלול הכללי אך <span class="num">__PE__</span> נק'
+        <b>שלילי במסלול המניות</b> — שם הרדיפה הזיקה.</li>
     </ol>
-    <p class="body">הנתונים המלאים והקוד בתיקיית <code>analysis/</code>. לקורא/ת נותרת
-      ההחלטה כיצד לשקלל ממצאים אלה.</p>
+    <p class="body"><b>הסתייגות (הטיית שרידות):</b> המחקר כולל רק קופות שלא נסגרו
+      (קיימות ב־2025), לפי בקשה. הדבר מסיר את סוגיית הקופות שנעלמו אך גם מטה את
+      התוצאות כלפי מעלה — כך ששיעורי שמירת המעמד כאן הם ככל הנראה תקרה אופטימית.
+      הנתונים המלאים והקוד בתיקיית <code>analysis/</code>; לקורא/ת נותרת ההחלטה כיצד
+      לשקלל ממצאים אלה.</p>
   </div>
 
   <div class="foot">
     שחזור: <code>build_annual.py</code> → <code>chase_analysis.py</code> →
     <code>risk_check.py</code> → <code>make_report.py</code> / <code>build_html.py</code>.
-    תשואה שנתית חושבה משרשור התשואות החודשיות; נכללו רק שנים עם 12 חודשי דיווח.
-    הסימולציה הכספית אינה מנכה דמי ניהול, מס ועלויות מעבר.
+    מסלולי פנסיה חולצו משמות הקרנות; מסלולי המניות/אג"ח בגמל ובהשתלמות מונים מעט
+    קופות ששרדו ולכן אינם מוצגים. הסימולציה אינה מנכה דמי ניהול, מס ועלויות מעבר.
   </div>
 </div>
 
@@ -355,7 +360,6 @@ function txt(x,y,s,o={}){const t=el("text",{x,y,...o});t.textContent=s;return t;
   document.getElementById("s_no1").textContent=Math.round(p1.no1)+"%";
   document.getElementById("s_top3").textContent=Math.round(p1.top3)+"%";
   document.getElementById("s_bot").textContent=Math.round(p1.bot)+"%";
-  document.getElementById("s_van").textContent=Math.round(p1.vanished)+"%";
   document.getElementById("s_medrank").textContent=
     "מקום "+p1.med_rank+" מתוך ~"+p1.med_n;
 })();
@@ -369,8 +373,8 @@ function txt(x,y,s,o={}){const t=el("text",{x,y,...o});t.textContent=s;return t;
     {k:"no1",lab:"מקום 1",col:css("--gold")},
     {k:"top3",lab:"שלושה ראשונים",col:css("--teal")},
     {k:"topq",lab:"רבעון עליון",col:css("--teal")},
+    {k:"half",lab:"מחצית עליונה",col:css("--teal")},
     {k:"bot",lab:"מחצית תחתונה",col:css("--clay")},
-    {k:"vanished",lab:"נסגרו/מוזגו",col:css("--base")},
   ];
   const y=v=>mT+ih*(1-v/100);
   [0,25,50,75,100].forEach(g=>{
@@ -541,5 +545,6 @@ document.getElementById("volInline").textContent=Math.round(D.pooled_vol);
 </div>"""
 
 open(os.path.join(HERE, "report.html"), "w", encoding="utf-8").write(
-    HTML.replace("__DATA__", DATA).replace("__SG__", SG).replace("__PG__", PG))
+    HTML.replace("__DATA__", DATA).replace("__SG__", SG).replace("__PG__", PG)
+        .replace("__PE__", PE))
 print("wrote report.html")
