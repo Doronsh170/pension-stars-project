@@ -619,39 +619,48 @@ def _split_chart(rows):
     out.append('</svg>')
     return "".join(out)
 
-# ---- a concrete illustration: the top-3 leaders of one category in one year,
-#      and where each landed the year after. Computed from annual_returns.csv with
-#      the same ranking rule as the study (12 complete months, sorted by return),
-#      so names and places stay exact and in sync. 2017 in the flagship track is a
-#      fair, non-extreme case: two of the three leaders slipped below the median
-#      the next year while one held the top quarter. ----
-EX_CAT, EX_YEAR = 'קרנות השתלמות | כללי', "2017"
+# ---- concrete illustrations: for several category-years, the top-3 leaders and
+#      where each landed the year after. Computed from annual_returns.csv with the
+#      study's own ranking rule (12 complete months, sorted by return), so names
+#      and places stay exact and in sync. A deliberately varied, recent-weighted
+#      set: sometimes the leaders held their place, sometimes they sank, sometimes
+#      they scattered — so the gallery shows the real spread, not a chosen story. ----
+EXAMPLES = [
+    ('קרנות השתלמות | כללי', "2017"),          # drifted to mid-pack
+    ('קרנות השתלמות | כללי', "2022"),          # down-year leaders sank
+    ('קרנות השתלמות | כללי', "2024"),          # mostly held
+    ('תגמולים ואישית לפיצויים | כללי', "2023"),# held the top
+    ('קרנות כלליות', "2021"),                   # equity leaders reversed hard
+    ('קרנות חדשות', "2023"),                    # scattered
+]
 _ar = list(csv.DictReader(open(os.path.join(HERE, "annual_returns.csv"), encoding="utf-8-sig")))
-_byyear = defaultdict(list)
+_by = defaultdict(lambda: defaultdict(list))   # category -> year -> [(fid, name, ret)]
 for r in _ar:
-    if r["category"] == EX_CAT and int(r["n_months"]) == 12:
-        _byyear[r["year"]].append((r["fund_id"], r["fund_name"], float(r["annual_return"])))
+    if int(r["n_months"]) == 12:
+        _by[r["category"]][r["year"]].append((r["fund_id"], r["fund_name"], float(r["annual_return"])))
 def _rank_map(funds):
     s = sorted(funds, key=lambda x: -x[2])
     return {f[0]: i + 1 for i, f in enumerate(s)}, len(s), s
-_next = str(int(EX_YEAR) + 1)
-_, _n_sig, _s_sig = _rank_map(_byyear[EX_YEAR])
-_nrank, _n_next, _ = _rank_map(_byyear[_next])
 def _rank_cls(rank, n):
     if rank <= (n + 3) // 4: return "top"
     if rank > n / 2: return "low"
     return "mid"
-_ex = []
-for fid, name, ret in _s_sig[:3]:
-    rk = _nrank.get(fid)
-    if rk is None:
-        nxt = '<span class="ex-next low">נסגרה או מוזגה</span>'
-    else:
-        nxt = f'<span class="ex-next {_rank_cls(rk, _n_next)}">מקום {rk} מתוך {_n_next}</span>'
-    _ex.append(f'<div class="ex-row"><span class="ex-name">{name}</span>'
-               f'<span class="ex-sig num">{ret:+.1f}%</span>'
-               f'<span class="ex-arrow">←</span>{nxt}</div>')
-EX_ROWS = "".join(_ex)
+def _ex_card(cat, yr):
+    nxt = str(int(yr) + 1)
+    _, _, s_sig = _rank_map(_by[cat][yr])
+    nrank, n_next, _ = _rank_map(_by[cat][nxt])
+    rows = []
+    for fid, name, ret in s_sig[:3]:
+        rk = nrank.get(fid)
+        cell = ('<span class="ex-next low">נסגרה או מוזגה</span>' if rk is None
+                else f'<span class="ex-next {_rank_cls(rk, n_next)}">מקום {rk} מתוך {n_next}</span>')
+        rows.append(f'<div class="ex-row"><span class="ex-name">{name}</span>'
+                    f'<span class="ex-sig num">{ret:+.1f}%</span>'
+                    f'<span class="ex-arrow">←</span>{cell}</div>')
+    return (f'<div class="ex-card"><div class="ex-head">'
+            f'{label(cat)} · <span class="ex-yr num">{yr}</span></div>'
+            f'<div class="ex-list">{"".join(rows)}</div></div>')
+EX_CARDS = "".join(_ex_card(c, y) for c, y in EXAMPLES)
 
 IDX = {
     "no1":   f"{round(p1['no1'])}%",
@@ -663,8 +672,7 @@ IDX = {
     "van1":  f"{round(p1['vanished'])}%",
     "van3":  f"{round(persist[2]['vanished'])}%",
     "events": str(TOTAL_EVENTS),
-    "chart": _split_chart(persist),
-    "ex_label": label(EX_CAT), "ex_year": EX_YEAR, "ex_next": _next, "ex_rows": EX_ROWS,
+    "chart": _split_chart(persist), "ex_cards": EX_CARDS,
 }
 
 INDEX = r"""<!doctype html>
@@ -738,16 +746,22 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
 .example{background:var(--raised);border:1px solid var(--line);border-radius:16px;
   box-shadow:var(--shadow);padding:22px 24px;margin:22px 0 0}
 .example .sec-eyebrow{text-align:start;margin-bottom:12px}
-.ex-intro{margin:0 0 14px;font-size:15.5px}
-.ex-list{display:flex;flex-direction:column;gap:8px}
-.ex-row{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;
-  padding:10px 14px;background:var(--paper);border:1px solid var(--line2);border-radius:10px}
-.ex-name{flex:1 1 170px;font-weight:600;font-size:14.5px}
-.ex-sig{font-size:14px;color:var(--gold);font-weight:700}
-.ex-arrow{color:var(--faint);font-size:15px}
-.ex-next{font-size:14px;font-weight:700;color:var(--muted)}
+.ex-intro{margin:0 0 16px;font-size:15.5px}
+.ex-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:620px){.ex-grid{grid-template-columns:1fr}}
+.ex-card{background:var(--paper);border:1px solid var(--line2);border-radius:12px;padding:12px 15px}
+.ex-head{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:4px}
+.ex-head .ex-yr{color:var(--ink);font-weight:800}
+.ex-list{display:flex;flex-direction:column}
+.ex-row{display:flex;align-items:center;gap:2px 10px;flex-wrap:wrap;
+  padding:9px 0;border-top:1px solid var(--line2)}
+.ex-row:first-child{border-top:none}
+.ex-name{flex:1 1 100%;font-weight:600;font-size:13.5px;margin-bottom:1px}
+.ex-sig{font-size:13px;color:var(--gold);font-weight:700}
+.ex-arrow{color:var(--faint);font-size:14px}
+.ex-next{font-size:13px;font-weight:700;color:var(--muted)}
 .ex-next.top{color:var(--teal)} .ex-next.low{color:var(--clay)}
-.ex-note{margin:14px 0 0;font-size:13px;color:var(--faint)}
+.ex-note{margin:16px 0 0;font-size:13px;color:var(--faint)}
 
 .summary{background:var(--raised);border:1px solid var(--line);border-radius:16px;
   box-shadow:var(--shadow);padding:24px 26px;margin:26px 0 30px;position:relative;overflow:hidden}
@@ -813,12 +827,11 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
   </div>
 
   <div class="example">
-    <div class="sec-eyebrow teal">דוגמה מוחשית · __EX_LABEL__</div>
-    <p class="ex-intro">שלוש הקופות שהובילו בתשואה בשנת <span class="num">__EX_YEAR__</span>,
-      והמקום שבו דורגו שנה לאחר מכן (<span class="num">__EX_NEXT__</span>):</p>
-    <div class="ex-list">__EX_ROWS__</div>
-    <p class="ex-note">שנה אחת, להמחשה בלבד. במחקר המלא יש גם שנים שבהן מובילות שמרו על
-      מקומן, לצד הרשימה המלאה בכל הקטגוריות.</p>
+    <div class="sec-eyebrow teal">דוגמאות מוחשיות מהשנים האחרונות</div>
+    <p class="ex-intro">בכל דוגמה: שלוש הקופות שהובילו בתשואה בקטגוריה בשנה מסוימת, והמקום
+      שבו דורגו שנה לאחר מכן. לעיתים שמרו על מקומן, לעיתים צנחו.</p>
+    <div class="ex-grid">__EX_CARDS__</div>
+    <p class="ex-note">להמחשה בלבד. הרשימה המלאה, בכל הקטגוריות ובכל השנים, נמצאת במחקר המלא.</p>
   </div>
 
   <section class="summary">
@@ -862,8 +875,7 @@ for k, v in {"__NO1__":IDX["no1"], "__BOT__":IDX["bot"], "__RANK__":IDX["rank"],
              "__N__":IDX["n"], "__SG__":IDX["sg"], "__PG__":IDX["pg"],
              "__VAN1__":IDX["van1"], "__VAN3__":IDX["van3"],
              "__EVENTS__":IDX["events"], "__CHART__":IDX["chart"],
-             "__EX_LABEL__":IDX["ex_label"], "__EX_YEAR__":IDX["ex_year"],
-             "__EX_NEXT__":IDX["ex_next"], "__EX_ROWS__":IDX["ex_rows"]}.items():
+             "__EX_CARDS__":IDX["ex_cards"]}.items():
     idx_out = idx_out.replace(k, v)
 open(os.path.join(HERE, os.pardir, "index.html"), "w", encoding="utf-8").write(idx_out)
 print("wrote index.html")
