@@ -631,48 +631,44 @@ def _split_chart(rows):
     out.append('</svg>')
     return "".join(out)
 
-# ---- concrete illustrations: for several category-years, the top-3 leaders and
-#      where each landed the year after. Computed from annual_returns.csv with the
-#      study's own ranking rule (12 complete months, sorted by return), so names
-#      and places stay exact and in sync. A deliberately varied, recent-weighted
-#      set: sometimes the leaders held their place, sometimes they sank, sometimes
-#      they scattered — so the gallery shows the real spread, not a chosen story. ----
+# ---- concrete illustrations: follow ONE winning fund through time. Each card
+#      names the fund and the year it finished #1 in its category, then shows how
+#      it ranked one, two and three years later. Straight from events.csv, so the
+#      names and places stay exact. A deliberately varied set of broad, well-known
+#      funds: some kept winning, some slid to mid-pack, some collapsed. ----
 EXAMPLES = [
-    ('קרנות השתלמות | כללי', "2020"),  # mixed: two near the top, one slipped
-    ('קרנות השתלמות | כללי', "2022"),  # down-year leaders drifted down
-    ('קרנות השתלמות | כללי', "2024"),  # mixed
-    ('קרנות כלליות', "2021"),           # equity leaders reversed hard
-    ('קרנות חדשות', "2023"),            # scattered
-    ('קרנות כלליות', "2023"),           # held the top
+    ('gemel', 'קרנות השתלמות | כללי', "2019"),  # מור — kept its place at the top
+    ('gemel', 'קרנות השתלמות | כללי', "2021"),  # אנליסט — dropped, then back to #1
+    ('gemel', 'קרנות השתלמות | כללי', "2022"),  # מור — settled into mid-pack
+    ('pension', 'קרנות חדשות', "2019"),          # אלטשולר — from near-top to last
+    ('pension', 'קרנות כלליות', "2020"),         # מגדל — top, crash, recovery
+    ('pension', 'קרנות חדשות', "2021"),          # מיטב — mid, then top
 ]
-_ar = list(csv.DictReader(open(os.path.join(HERE, "annual_returns.csv"), encoding="utf-8-sig")))
-_by = defaultdict(lambda: defaultdict(list))   # category -> year -> [(fid, name, ret)]
-for r in _ar:
-    if int(r["n_months"]) == 12:
-        _by[r["category"]][r["year"]].append((r["fund_id"], r["fund_name"], float(r["annual_return"])))
-def _rank_map(funds):
-    s = sorted(funds, key=lambda x: -x[2])
-    return {f[0]: i + 1 for i, f in enumerate(s)}, len(s), s
+_evx = {(e["domain"], e["category"], e["signal_year"]): e for e in events}
 def _rank_cls(rank, n):
     if rank <= (n + 3) // 4: return "top"
     if rank > n / 2: return "low"
     return "mid"
-def _ex_card(cat, yr):
-    nxt = str(int(yr) + 1)
-    _, _, s_sig = _rank_map(_by[cat][yr])
-    nrank, n_next, _ = _rank_map(_by[cat][nxt])
-    rows = []
-    for fid, name, ret in s_sig[:3]:
-        rk = nrank.get(fid)
-        cell = ('<span class="ex-next low">נסגרה או מוזגה</span>' if rk is None
-                else f'<span class="ex-next {_rank_cls(rk, n_next)}">מקום {rk} מתוך {n_next}</span>')
-        rows.append(f'<div class="ex-row"><span class="ex-name">{clean_name(name)}</span>'
-                    f'<span class="ex-sig num">{ret:+.1f}%</span>'
-                    f'<span class="ex-arrow">←</span>{cell}</div>')
-    return (f'<div class="ex-card"><div class="ex-head">'
-            f'{label(cat)} · <span class="ex-yr num">{yr}</span></div>'
-            f'<div class="ex-list">{"".join(rows)}</div></div>')
-EX_CARDS = "".join(_ex_card(c, y) for c, y in EXAMPLES)
+def _ex_card(dom, cat, yr):
+    e = _evx[(dom, cat, yr)]
+    steps = []
+    for k, when in ((1, "אחרי שנה"), (2, "אחרי שנתיים"), (3, "אחרי שלוש שנים")):
+        st = e.get(f"y{k}_status")
+        if st == "present":
+            rk, n, ret = int(e[f"y{k}_rank"]), int(e[f"y{k}_n"]), float(e[f"y{k}_return"])
+            place = (f'<span class="ex-place {_rank_cls(rk, n)}">מקום {rk} מתוך {n} '
+                     f'<span class="ex-ret num">{ret:+.0f}%</span></span>')
+        elif st == "absent":
+            place = '<span class="ex-place low">נסגרה או מוזגה</span>'
+        else:
+            place = '<span class="ex-place none">אין נתונים</span>'
+        steps.append(f'<div class="ex-step"><span class="ex-when">{when}</span>{place}</div>')
+    return (f'<div class="ex-card">'
+            f'<div class="ex-fund">{clean_name(e["winner_name"])}</div>'
+            f'<div class="ex-won">{label(cat)} · מקום 1 בשנת <span class="num">{yr}</span> '
+            f'(<span class="num">{float(e["signal_return"]):+.0f}%</span>)</div>'
+            f'<div class="ex-track">{"".join(steps)}</div></div>')
+EX_CARDS = "".join(_ex_card(d, c, y) for d, c, y in EXAMPLES)
 
 IDX = {
     "no1":   f"{round(p1['no1'])}%",
@@ -761,18 +757,18 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
 .ex-intro{margin:0 0 16px;font-size:15.5px}
 .ex-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:620px){.ex-grid{grid-template-columns:1fr}}
-.ex-card{background:var(--paper);border:1px solid var(--line2);border-radius:12px;padding:12px 15px}
-.ex-head{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:4px}
-.ex-head .ex-yr{color:var(--ink);font-weight:800}
-.ex-list{display:flex;flex-direction:column}
-.ex-row{display:flex;align-items:center;gap:2px 10px;flex-wrap:wrap;
-  padding:9px 0;border-top:1px solid var(--line2)}
-.ex-row:first-child{border-top:none}
-.ex-name{flex:1 1 100%;font-weight:600;font-size:13.5px;margin-bottom:1px}
-.ex-sig{font-size:13px;color:var(--gold);font-weight:700}
-.ex-arrow{color:var(--faint);font-size:14px}
-.ex-next{font-size:13px;font-weight:700;color:var(--muted)}
-.ex-next.top{color:var(--teal)} .ex-next.low{color:var(--clay)}
+.ex-card{background:var(--paper);border:1px solid var(--line2);border-radius:12px;padding:14px 16px}
+.ex-fund{font-weight:700;font-size:14.5px;line-height:1.35}
+.ex-won{font-size:12.5px;color:var(--muted);margin-top:4px}
+.ex-track{margin-top:12px;display:flex;flex-direction:column}
+.ex-step{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  padding:8px 0;border-top:1px solid var(--line2)}
+.ex-step:first-child{border-top:none}
+.ex-when{font-size:13px;color:var(--muted);white-space:nowrap}
+.ex-place{font-size:13.5px;font-weight:700;color:var(--muted);text-align:start}
+.ex-place.top{color:var(--teal)} .ex-place.low{color:var(--clay)}
+.ex-place.none{color:var(--faint);font-weight:400}
+.ex-ret{font-weight:600;font-size:12px;color:var(--faint);margin-inline-start:2px}
 .ex-note{margin:16px 0 0;font-size:13px;color:var(--faint)}
 
 .summary{background:var(--raised);border:1px solid var(--line);border-radius:16px;
@@ -839,11 +835,12 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
   </div>
 
   <div class="example">
-    <div class="sec-eyebrow teal">דוגמאות מוחשיות מהשנים האחרונות</div>
-    <p class="ex-intro">בכל דוגמה: שלוש הקופות שהובילו בתשואה בקטגוריה בשנה מסוימת, והמקום
-      שבו דורגו שנה לאחר מכן. לעיתים שמרו על מקומן, לעיתים צנחו.</p>
+    <div class="sec-eyebrow teal">דוגמאות מוחשיות: קופה אחת לאורך זמן</div>
+    <p class="ex-intro">כל דוגמה עוקבת אחרי קופה אחת שסיימה במקום הראשון בקטגוריה שלה בשנה
+      מסוימת, ומראה היכן דורגה שנה, שנתיים ושלוש שנים לאחר מכן. לעיתים שמרה על מקומה,
+      לעיתים צנחה.</p>
     <div class="ex-grid">__EX_CARDS__</div>
-    <p class="ex-note">להמחשה בלבד. הרשימה המלאה, בכל הקטגוריות ובכל השנים, נמצאת במחקר המלא.</p>
+    <p class="ex-note">להמחשה בלבד. המעקב המלא, בכל הקטגוריות ובכל השנים, נמצא במחקר המלא.</p>
   </div>
 
   <section class="summary">
