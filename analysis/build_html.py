@@ -563,18 +563,50 @@ print("wrote report.html")
 
 # =====================================================================
 # Stage 5 - the simple, few-seconds landing page (index.html at repo root).
-# Same source data as the full report, so the headline numbers stay in sync.
+# Order of the page: research question -> the data & a descriptive chart ->
+# only then a cautious summary. Same source data as the full report, so the
+# headline numbers stay in sync.
 # =====================================================================
 p1 = persist[0]
+
+def _split_chart(rows):
+    """Descriptive stacked bars: among surviving leaders, the share that stayed
+    in the top half of their category vs. fell to the bottom half, after 1/2/3
+    years. A true partition (segments sum to 100%) so nothing is double-counted."""
+    W, L, R, top, rowH, gap = 640, 44, 596, 20, 30, 42
+    TW = R - L
+    out = [f'<svg viewBox="0 0 {W} 206" role="img" '
+           f'aria-label="דירוג המובילות: מחצית עליונה מול תחתונה לאחר שנה, שנתיים ושלוש">']
+    for i, d in enumerate(rows):
+        y = top + i * (rowH + gap)
+        h, b = d["half"], d["bot"]
+        topW = h / 100 * TW
+        tx = R - topW
+        cy = y + rowH / 2 + 5
+        out += [
+            f'<text x="{R}" y="{y-7}" text-anchor="end" font-size="13" font-weight="700" '
+            f'fill="var(--muted)">שנה +{d["h"]}</text>',
+            f'<rect x="{tx:.1f}" y="{y}" width="{topW:.1f}" height="{rowH}" rx="4" fill="var(--teal)"/>',
+            f'<rect x="{L}" y="{y}" width="{tx-L:.1f}" height="{rowH}" rx="4" fill="var(--clay)"/>',
+            f'<text x="{(tx+R)/2:.1f}" y="{cy:.1f}" text-anchor="middle" font-size="13" '
+            f'font-weight="800" fill="#fff" style="direction:ltr">{round(h)}%</text>',
+            f'<text x="{(L+tx)/2:.1f}" y="{cy:.1f}" text-anchor="middle" font-size="13" '
+            f'font-weight="800" fill="#fff" style="direction:ltr">{round(b)}%</text>',
+        ]
+    out.append('</svg>')
+    return "".join(out)
+
 IDX = {
     "no1":   f"{round(p1['no1'])}%",
     "bot":   f"{round(p1['bot'])}%",
-    "top3":  f"{round(p1['top3'])}%",
     "rank":  f"{p1['med_rank']}",
     "n":     f"{p1['med_n']}",
     "sg":    SG,   # קרן השתלמות · כללי, e.g. +0.15
     "pg":    PG,   # קופת גמל · כללי, e.g. −0.39
+    "van1":  f"{round(p1['vanished'])}%",
+    "van3":  f"{round(persist[2]['vanished'])}%",
     "events": str(TOTAL_EVENTS),
+    "chart": _split_chart(persist),
 }
 
 INDEX = r"""<!doctype html>
@@ -582,7 +614,7 @@ INDEX = r"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>קופות שהובילו בתשואה — מה קרה להן אחר כך?</title>
+<title>מה קרה לקופות שהובילו בתשואה בשנים שלאחר מכן?</title>
 <style>
 :root{
   --paper:#F4F6F8; --raised:#FFFFFF; --ink:#12171E; --muted:#5A6A7A; --faint:#8A97A3;
@@ -624,21 +656,35 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
 .stat{background:var(--raised);border:1px solid var(--line);border-radius:16px;
   box-shadow:var(--shadow);padding:22px 16px;text-align:center}
 .stat .v{font-size:clamp(34px,7vw,44px);font-weight:800;line-height:1;letter-spacing:-.02em}
-.stat.a .v{color:var(--gold)} .stat.b .v{color:var(--clay)} .stat.c .v{color:var(--teal)}
+.stat.a .v{color:var(--gold)} .stat.b .v{color:var(--teal)} .stat.c .v{color:var(--clay)}
 .stat .l{font-size:13.5px;color:var(--muted);margin-top:12px;line-height:1.45}
 @media(max-width:560px){.stats{grid-template-columns:1fr;gap:12px}
   .stat{display:flex;align-items:center;gap:18px;text-align:start;padding:18px 20px}
   .stat .v{font-size:38px} .stat .l{margin-top:0}}
 
-.takeaway{background:var(--raised);border:1px solid var(--line);border-radius:16px;
-  box-shadow:var(--shadow);padding:24px 26px;margin:26px 0 0;position:relative;overflow:hidden}
-.takeaway::before{content:"";position:absolute;inset-inline-start:0;top:0;bottom:0;
+.sec-eyebrow{font-size:12px;letter-spacing:.16em;font-weight:700;color:var(--faint);
+  margin:0 0 12px;text-align:center}
+.sec-eyebrow.teal{color:var(--teal)}
+.framing{font-size:14.5px;color:var(--faint);text-align:center;margin:10px auto 0;max-width:50ch}
+
+.figure{background:var(--raised);border:1px solid var(--line);border-radius:16px;
+  box-shadow:var(--shadow);padding:22px 22px 16px;margin:22px 0 0}
+.figure svg{display:block;width:100%;height:auto;margin:4px 0}
+.cap{font-size:13px;color:var(--muted);line-height:1.5;margin:2px 0 14px}
+.cap.fine{margin:14px 0 0;font-size:12.5px;color:var(--faint)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 20px;justify-content:center;
+  font-size:12.5px;color:var(--muted);margin-top:6px}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+
+.summary{background:var(--raised);border:1px solid var(--line);border-radius:16px;
+  box-shadow:var(--shadow);padding:24px 26px;margin:26px 0 30px;position:relative;overflow:hidden}
+.summary::before{content:"";position:absolute;inset-inline-start:0;top:0;bottom:0;
   width:4px;background:var(--teal)}
-.takeaway p{margin:0;font-size:17px}
-.takeaway p + p{margin-top:12px}
-.takeaway b{font-weight:800}
-.neutral{margin:22px 0 30px;text-align:center;font-size:15px;color:var(--muted)}
-.neutral b{color:var(--ink);font-weight:700}
+.summary .sec-eyebrow{text-align:start;margin-bottom:14px}
+.summary p{margin:0;font-size:16.5px} .summary p + p{margin-top:12px}
+.summary b{font-weight:800}
+.summary p.fine{font-size:14px;color:var(--muted)}
 
 .cta{display:flex;flex-direction:column;align-items:center;gap:14px}
 .btn{display:inline-flex;align-items:center;gap:10px;background:var(--teal);color:#fff;
@@ -655,42 +701,59 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
 <body>
 <main class="card">
   <div class="kicker">חיסכון ארוך טווח · נתוני רשות שוק ההון</div>
-  <h1>קופה הובילה בתשואה. כדאי לעבור אליה?</h1>
-  <p class="lede">בדקנו חוסך שבכל תחילת שנה מעביר את כספו לקופה שהשיגה את התשואה
-    הגבוהה ביותר בקטגוריה שלו אשתקד — ועקבנו מה קרה לאותה קופה בשנים שאחרי.</p>
+  <h1>מה קרה לקופות שהובילו בתשואה בשנים שלאחר מכן?</h1>
+  <p class="lede">בכל תחילת שנה זיהינו את הקופה שהשיגה את התשואה הגבוהה ביותר בקטגוריה
+    שלה בשנה שחלפה, ועקבנו אחר הדירוג והתשואה שלה בשלוש השנים הבאות — בהפרדה בין
+    קרן השתלמות, קופת גמל וקרן פנסיה.</p>
+  <p class="framing">בדיקה תיאורית: היא מתארת מה קרה בפועל, ואינה המלצה לפעולה.</p>
 
   <div class="divider"></div>
 
+  <div class="sec-eyebrow">הנתונים</div>
   <div class="stats">
     <div class="stat a">
       <div class="v num">__NO1__</div>
-      <div class="l">בלבד מהמובילות חזרו למקום הראשון בשנה שאחרי</div>
+      <div class="l">מהמובילות חזרו למקום הראשון בשנה שאחרי</div>
     </div>
     <div class="stat b">
-      <div class="v num">__BOT__</div>
-      <div class="l">מהמובילות צנחו למחצית התחתונה כבר אחרי שנה</div>
+      <div class="v num">__RANK__</div>
+      <div class="l">הדירוג החציוני של המובילה שנה אחרי — מתוך <span class="num">~__N__</span> קופות</div>
     </div>
     <div class="stat c">
-      <div class="v num">≈0</div>
-      <div class="l">הפער השנתי במסלול הכללי — שם מרוכז רוב כספם של החוסכים</div>
+      <div class="v num">__BOT__</div>
+      <div class="l">מהמובילות ירדו למחצית התחתונה כבר אחרי שנה</div>
     </div>
   </div>
 
-  <div class="takeaway">
-    <p>הקופה שהובילה אשתקד מדורגת בשנה שאחרי בממוצע סביב
-      <b>מקום <span class="num">__RANK__</span> מתוך <span class="num">~__N__</span></b> —
-      טובה מהממוצע, אך רחוקה מהמקום הראשון.</p>
-    <p>במסלולים <b>הכלליים</b> הפער בין "רודף" ל"נשאר" זעום ואף שלילי
-      (<span class="num">__SG__</span> נק' בקרן השתלמות, <span class="num">__PG__</span> נק'
-      בקופת גמל). הפערים הגדולים מופיעים דווקא במסלולי המניות ובפנסיה — היכן שהמובילה
-      נוטה להיות הקופה <b>המסוכנת יותר</b> בקבוצתה.</p>
+  <div class="figure">
+    <div class="cap">מבין הקופות ששרדו — כמה מהמובילות נשארו במחצית העליונה של הקטגוריה
+      וכמה ירדו לתחתונה, לאחר שנה, שנתיים ושלוש.</div>
+    __CHART__
+    <div class="legend">
+      <span><i class="dot" style="background:var(--teal)"></i> מחצית עליונה של הקטגוריה</span>
+      <span><i class="dot" style="background:var(--clay)"></i> מחצית תחתונה</span>
+    </div>
+    <div class="cap fine">בנוסף, שיעור הקופות שנסגרו או מוזגו עלה מכ־<span class="num">__VAN1__</span>
+      בשנה הראשונה לכ־<span class="num">__VAN3__</span> עד השנה השלישית.</div>
   </div>
 
-  <p class="neutral">זה לא ייעוץ ולא המלצה. <b>אלה העובדות — וההחלטה שלך.</b></p>
+  <section class="summary">
+    <div class="sec-eyebrow teal">מה נראה מהנתונים — בזהירות</div>
+    <p>מובילות העבר שומרות על מעמדן באופן חלקי וזמני בלבד: רק מיעוט חוזרות לצמרת, ורבות
+      מהן צונחות בהמשך או אף נסגרות.</p>
+    <p>יתרון כספי עקבי <b>לא נמצא במסלולים הכלליים</b>, שבהם מרוכז רוב כספם של החוסכים —
+      שם הפער היה זעום ואף שלילי (<span class="num">__SG__</span> נק' בקרן השתלמות כללי,
+      <span class="num">__PG__</span> נק' בקופת גמל כללי). פערים גדולים יותר הופיעו במסלולי
+      המניות ובפנסיה, אך אלה נטו להיות המסלולים בעלי הסיכון הגבוה יותר, בתקופה שהתאפיינה
+      בעיקר בעליות בשווקים — כך ש<b>ייתכן</b> שחלק מהפער משקף רמת סיכון ולא בהכרח התמדה
+      בביצועים.</p>
+    <p class="fine">הבדיקה תיאורית ואינה מנכה דמי ניהול, מס ועלויות מעבר. ההחלטה כיצד
+      לשקלל את הממצאים נותרת בידי הקורא.</p>
+  </section>
 
   <div class="cta">
     <a class="btn" href="analysis/report.html">
-      <span>למחקר המלא, לנתונים ולמתודולוגיה</span><span class="ar">←</span>
+      <span>למחקר המלא, למתודולוגיה ולטבלאות</span><span class="ar">←</span>
     </a>
     <div class="subnote">טבלאות שנה־אחר־שנה לכל קטגוריה · ניתוח סיכון · הקוד המלא</div>
   </div>
@@ -707,7 +770,8 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
 idx_out = INDEX
 for k, v in {"__NO1__":IDX["no1"], "__BOT__":IDX["bot"], "__RANK__":IDX["rank"],
              "__N__":IDX["n"], "__SG__":IDX["sg"], "__PG__":IDX["pg"],
-             "__EVENTS__":IDX["events"]}.items():
+             "__VAN1__":IDX["van1"], "__VAN3__":IDX["van3"],
+             "__EVENTS__":IDX["events"], "__CHART__":IDX["chart"]}.items():
     idx_out = idx_out.replace(k, v)
 open(os.path.join(HERE, os.pardir, "index.html"), "w", encoding="utf-8").write(idx_out)
 print("wrote index.html")
