@@ -48,6 +48,7 @@ def load_rows():
         c_name = idx["FUND_NAME"]
         c_cls = idx["FUND_CLASSIFICATION"]
         c_spec = idx.get("SPECIALIZATION")  # pension has no specialization
+        c_tp = idx.get("TARGET_POPULATION")  # gemel only; marks who may join
         c_per = idx["REPORT_PERIOD"]
         c_my = idx["MONTHLY_YIELD"]
         for r in it:
@@ -57,12 +58,27 @@ def load_rows():
             per = str(per)
             if len(per) < 6:
                 continue
+            # Keep only broad funds that are open to the general public. Sectoral
+            # funds ("עובדי סקטור מסויים", e.g. a profession) and employer funds
+            # ("עובדי מפעל/גוף מסויים", e.g. a single company) are excluded: a
+            # typical saver cannot join them, so they are not real "chase" targets.
+            # The regulator's own TARGET_POPULATION field marks this (gemel only;
+            # pension funds carry no such field and are all open to the public).
+            if c_tp is not None:
+                tp = norm(r[c_tp])
+                if tp and tp != "כלל האוכלוסיה":
+                    continue
             name = norm(r[c_name])
             # Exclude self-managed / IRA wrappers ("בניהול אישי"). These are legal
             # shells for member-directed portfolios with no pooled fund yield; they
             # report placeholder ~0% returns that wrongly top the ranking in down
             # years, so they are not comparable investment products for this study.
             if name and ("בניהול אישי" in name or "IRA" in name):
+                continue
+            # Exclude central sick-pay funds ("דמי מחלה"): these are employer
+            # reserve vehicles for paying sick leave, not a personal savings
+            # product a saver would ever choose, so they don't belong in the pool.
+            if name and "דמי מחלה" in name:
                 continue
             year = int(per[:4]); month = int(per[4:6])
             spec = norm(r[c_spec]) if c_spec is not None else None

@@ -7,11 +7,15 @@ from the CSV outputs. Data is inlined so the page is faithful and reproducible.
 import csv, os, json, statistics, re
 from collections import defaultdict
 
-# Display-only tidy-up of fund names: the raw source mangles "S&P 500" into
-# variants like "S1;P500" and "s$p500". Normalize them for the page (the
-# underlying data files are left untouched).
+# Display-only tidy-up of fund names: the raw source mangles the "&" in "S&P"
+# into "1;" or "$" (e.g. "S1;P500", "s$p500", or a bare "s1;p"). Fix the
+# ampersand first, then ensure the space in "S&P500". Data files are untouched.
 def clean_name(s):
-    return re.sub(r'[sS](?:&|1;|\$)?[pP]\s*500', 'S&P 500', s) if s else s
+    if not s:
+        return s
+    s = re.sub(r'[sS](?:1;|\$|&)[pP]', 'S&P', s)   # s1;p / s$p / s&p -> S&P
+    s = re.sub(r'S&P(?=500)', 'S&P ', s)            # S&P500 -> S&P 500
+    return s
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -307,8 +311,9 @@ tr.closed td{color:var(--faint);font-style:italic}
     <p class="body"><b>(א) תוצאה כספית.</b> חוסך ש<span class="emteal">רודף</span> (עובר
       בכל שנה למובילת אשתקד) מול חוסך ש<span class="emteal">נשאר</span> בממוצע הקטגוריה.
       גודל הפער אינו אחיד: במסלולים <span class="em">הכלליים</span>, בהם מרוכז רוב
-      כספם של החוסכים, הפער זעום ואף שלילי (כ־<span class="num">__SG__</span> נק' בקרן
-      השתלמות כללי אך <span class="num">__PG__</span> נק' בקופת גמל כללי), והפערים
+      כספם של החוסכים, לא נמצא יתרון לרודף, ובנקודת האומדן הפער אף שלילי
+      (כ־<span class="num">__SG__</span> נק' בקרן השתלמות כללי, כ־<span class="num">__PG__</span>
+      נק' בקופת גמל כללי), והפערים
       הגדולים מופיעים במסלולי המניות ובקרנות הפנסיה.</p>
     <div class="figure">
       <div class="cap">פער התשואה השנתית (CAGR) בין "רודף" ל"נשאר", בנקודות אחוז, לפי קטגוריה.</div>
@@ -333,9 +338,9 @@ tr.closed td{color:var(--faint);font-style:italic}
     <h2>עד כמה הממצאים מוצקים?</h2>
     <p class="body">לא הסתפקנו בממוצעים, אלא בדקנו כמה מהם עמידים סטטיסטית (מבחני
       bootstrap; המספרים המלאים ורווחי הסמך בקובץ <code>robustness.py</code>).</p>
-    <p class="body"><b>ההתמדה קטנה וקצרת טווח.</b> היתרון של מובילת אשתקד על פני ממוצע
-      הקטגוריה אמיתי, אך רק בשנה ובשנתיים הראשונות; בשנה השלישית הוא כבר בתחום שאפשר
-      לייחס למקרה.</p>
+    <p class="body"><b>ההתמדה קטנה ולא יציבה.</b> היתרון של מובילת אשתקד על פני ממוצע
+      הקטגוריה קטן, ולרוב אינו חורג בבירור מגבול המקריות; הוא אינו עקבי לאורך זמן ונעלם
+      בתוך שלוש שנים.</p>
     <p class="body"><b>והוא תלוי בקופות ששרדו.</b> כאשר מכניסים לחשבון גם את הקופות
       שנסגרו או מוזגו, היתרון נעלם. כלומר הוא מופיע רק אם מתעלמים מהן.</p>
     <p class="body"><b>במסלולים הכלליים אין הבדל של ממש.</b> הפער הכספי בין "רודף"
@@ -356,13 +361,13 @@ tr.closed td{color:var(--faint);font-style:italic}
     <h2>תמצית הממצאים</h2>
     <p class="body">הנתונים ההיסטוריים מצביעים על התמונה הבאה, המוצגת כעובדות:</p>
     <ol>
-      <li><b>שמירת מעמד חלקית וזמנית.</b> רק כ־12% מהמובילות חזרו למקום הראשון בשנה
-        שאחרי, כ־40% ירדו למחצית התחתונה, ובתוך שלוש שנים כרבע מהן נסגרו או מוזגו.</li>
+      <li><b>שמירת מעמד חלקית וזמנית.</b> רק כ־9% מהמובילות חזרו למקום הראשון בשנה
+        שאחרי, כ־46% ירדו למחצית התחתונה, ובתוך שלוש שנים כשליש מהן נסגרו או מוזגו.</li>
       <li><b>הדירוג האופייני הוא "טוב מהממוצע", לא "מוביל".</b> מובילת אשתקד מדורגת
         בשנה שאחרי סביב השליש העליון, והאחוזון הממוצע מתכנס אל עבר האמצע עם הזמן.</li>
-      <li><b>היתרון הכספי אינו אחיד וקשור לסיכון.</b> במסלולים הכלליים הפער זעום ואף
-        שלילי (קרן השתלמות כללי <span class="num">__SG__</span> נק', קופת גמל כללי
-        <span class="num">__PG__</span> נק' לשנה), והפערים הגדולים מופיעים במסלולי
+      <li><b>היתרון הכספי אינו אחיד וקשור לסיכון.</b> במסלולים הכלליים לא נמצא יתרון,
+        ובנקודת האומדן הפער אף שלילי (קרן השתלמות כללי <span class="num">__SG__</span> נק',
+        קופת גמל כללי <span class="num">__PG__</span> נק' לשנה), והפערים הגדולים מופיעים במסלולי
         המניות ובקרנות הפנסיה, היכן שהמובילה נוטה להיות הקופה המסוכנת יותר,
         בתקופה של שווקים עולים.</li>
     </ol>
@@ -373,8 +378,9 @@ tr.closed td{color:var(--faint);font-style:italic}
   <div class="foot">
     שחזור: <code>build_annual.py</code> → <code>chase_analysis.py</code> →
     <code>risk_check.py</code> → <code>robustness.py</code> → <code>make_report.py</code> / <code>build_html.py</code>.
-    תשואה שנתית חושבה משרשור התשואות החודשיות; נכללו רק שנים עם 12 חודשי דיווח.
-    הסימולציה הכספית אינה מנכה דמי ניהול, מס ועלויות מעבר.
+    נכללות רק קופות הפתוחות לכלל הציבור; קופות סקטוריאליות, מגזריות וסגורות (וכן עוטפי
+    IRA וקופות דמי מחלה) הוצאו מהמדגם. תשואה שנתית חושבה משרשור התשואות החודשיות; נכללו
+    רק שנים עם 12 חודשי דיווח. הסימולציה הכספית אינה מנכה דמי ניהול, מס ועלויות מעבר.
   </div>
   <div class="foot" style="border-top:none;padding-top:0;margin-top:12px">
     <b>גילוי נאות:</b> התוכן נועד למידע כללי ולמטרות לימודיות בלבד, ואינו מהווה ייעוץ
@@ -632,12 +638,12 @@ def _split_chart(rows):
 #      set: sometimes the leaders held their place, sometimes they sank, sometimes
 #      they scattered — so the gallery shows the real spread, not a chosen story. ----
 EXAMPLES = [
-    ('קרנות השתלמות | כללי', "2017"),          # drifted to mid-pack
-    ('קרנות השתלמות | כללי', "2022"),          # down-year leaders sank
-    ('קרנות השתלמות | כללי', "2024"),          # mostly held
-    ('תגמולים ואישית לפיצויים | כללי', "2023"),# held the top
-    ('קרנות כלליות', "2021"),                   # equity leaders reversed hard
-    ('קרנות חדשות', "2023"),                    # scattered
+    ('קרנות השתלמות | כללי', "2020"),  # mixed: two near the top, one slipped
+    ('קרנות השתלמות | כללי', "2022"),  # down-year leaders drifted down
+    ('קרנות השתלמות | כללי', "2024"),  # mixed
+    ('קרנות כלליות', "2021"),           # equity leaders reversed hard
+    ('קרנות חדשות', "2023"),            # scattered
+    ('קרנות כלליות', "2023"),           # held the top
 ]
 _ar = list(csv.DictReader(open(os.path.join(HERE, "annual_returns.csv"), encoding="utf-8-sig")))
 _by = defaultdict(lambda: defaultdict(list))   # category -> year -> [(fid, name, ret)]
@@ -798,8 +804,8 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
   <div class="kicker">חיסכון ארוך טווח · נתוני רשות שוק ההון</div>
   <h1>מה קרה לקופות שהובילו בתשואה בשנים שלאחר מכן?</h1>
   <p class="lede">בכל תחילת שנה זיהינו את הקופה שהשיגה את התשואה הגבוהה ביותר בקטגוריה
-    שלה בשנה שחלפה, ועקבנו אחר הדירוג והתשואה שלה בשלוש השנים הבאות, בהפרדה בין
-    קרן השתלמות, קופת גמל וקרן פנסיה.</p>
+    שלה בשנה שחלפה, מבין הקופות הפתוחות לכלל הציבור, ועקבנו אחר הדירוג והתשואה שלה
+    בשלוש השנים הבאות, בהפרדה בין קרן השתלמות, קופת גמל וקרן פנסיה.</p>
   <p class="framing">בדיקה תיאורית: היא מתארת מה קרה בפועל, ואינה המלצה לפעולה.</p>
 
   <div class="divider"></div>
@@ -845,8 +851,8 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
     <p>מובילות העבר שומרות על מעמדן באופן חלקי וזמני בלבד: רק מיעוט חוזרות לצמרת, ורבות
       מהן צונחות בהמשך או אף נסגרות.</p>
     <p>יתרון כספי עקבי <b>לא נמצא במסלולים הכלליים</b>, שבהם מרוכז רוב כספם של החוסכים.
-      שם הפער היה זעום ואף שלילי (<span class="num">__SG__</span> נק' בקרן השתלמות כללי,
-      <span class="num">__PG__</span> נק' בקופת גמל כללי). פערים גדולים יותר הופיעו במסלולי
+      שם לא נמצא יתרון לרודף, ובנקודת האומדן הפער אף שלילי (<span class="num">__SG__</span>
+      נק' בקרן השתלמות כללי, <span class="num">__PG__</span> נק' בקופת גמל כללי). פערים גדולים יותר הופיעו במסלולי
       המניות ובפנסיה, אך אלה נטו להיות המסלולים בעלי הסיכון הגבוה יותר, בתקופה שהתאפיינה
       בעיקר בעליות בשווקים, כך ש<b>ייתכן</b> שחלק מהפער משקף רמת סיכון ולא בהכרח התמדה
       בביצועים.</p>
