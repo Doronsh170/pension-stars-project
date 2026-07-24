@@ -4,8 +4,14 @@
 Stage 4 - build a self-contained, theme-aware HTML report (analysis/report.html)
 from the CSV outputs. Data is inlined so the page is faithful and reproducible.
 """
-import csv, os, json, statistics
+import csv, os, json, statistics, re
 from collections import defaultdict
+
+# Display-only tidy-up of fund names: the raw source mangles "S&P 500" into
+# variants like "S1;P500" and "s$p500". Normalize them for the page (the
+# underlying data files are left untouched).
+def clean_name(s):
+    return re.sub(r'[sS](?:&|1;|\$)?[pP]\s*500', 'S&P 500', s) if s else s
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -82,7 +88,7 @@ for d,c in CAT_ORDER:
     rows=sorted(ev_by.get((d,c),[]),key=lambda x:int(x["signal_year"]))
     if not rows: continue
     cats.append({"label":label(c),"dom":d,"fam":family(c),
-        "rows":[{"y":int(e["signal_year"]),"name":e["winner_name"],
+        "rows":[{"y":int(e["signal_year"]),"name":clean_name(e["winner_name"]),
                  "sret":float(e["signal_return"]),"sn":int(e["signal_n"]),
                  "k1":cellobj(e,1),"k2":cellobj(e,2),"k3":cellobj(e,3)} for e in rows]})
 
@@ -654,7 +660,7 @@ def _ex_card(cat, yr):
         rk = nrank.get(fid)
         cell = ('<span class="ex-next low">נסגרה או מוזגה</span>' if rk is None
                 else f'<span class="ex-next {_rank_cls(rk, n_next)}">מקום {rk} מתוך {n_next}</span>')
-        rows.append(f'<div class="ex-row"><span class="ex-name">{name}</span>'
+        rows.append(f'<div class="ex-row"><span class="ex-name">{clean_name(name)}</span>'
                     f'<span class="ex-sig num">{ret:+.1f}%</span>'
                     f'<span class="ex-arrow">←</span>{cell}</div>')
     return (f'<div class="ex-card"><div class="ex-head">'
