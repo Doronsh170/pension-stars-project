@@ -94,7 +94,12 @@ def _gap(cat):
     return f'{float(s["gap_annualized_pp"]):+.2f}'.replace("-", "−") if s else "—"
 SG = _gap('קרנות השתלמות | כללי'); PG = _gap('תגמולים ואישית לפיצויים | כללי')
 
-HTML = r"""<div id="page" dir="rtl">
+HTML = r"""<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מה קרה בפועל לקופות שהובילו בתשואה? — המחקר המלא</title>
 <style>
 :root{
   --paper:#F4F6F8; --raised:#FFFFFF; --ink:#12171E; --muted:#5A6A7A; --faint:#8A97A3;
@@ -123,6 +128,12 @@ HTML = r"""<div id="page" dir="rtl">
   --shadow:0 1px 2px rgba(18,23,30,.04),0 8px 24px rgba(18,23,30,.06);
 }
 *{box-sizing:border-box}
+html,body{margin:0;background:var(--paper)}
+.backbar{max-width:860px;margin:0 auto;padding:20px 24px 0}
+.backbar a{display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:600;
+  color:var(--teal);text-decoration:none}
+.backbar a:hover{text-decoration:underline}
+.backbar .ar{font-size:16px}
 #page{background:var(--paper);color:var(--ink);
   font-family:"Segoe UI","Arial Hebrew","Assistant","Heebo",system-ui,-apple-system,sans-serif;
   line-height:1.7;font-size:17px;-webkit-font-smoothing:antialiased;
@@ -218,6 +229,10 @@ tr.closed td{color:var(--faint);font-style:italic}
 .foot code{background:var(--line2);padding:1px 6px;border-radius:5px;font-size:12px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
+</head>
+<body>
+<div id="page" dir="rtl">
+<div class="backbar"><a href="../index.html"><span class="ar">→</span> חזרה לתקציר</a></div>
 
 <div class="masthead"><div class="wrap">
   <div class="kicker">מחקר תיאורי · שוק החיסכון ארוך הטווח</div>
@@ -538,8 +553,161 @@ document.getElementById("volInline").textContent=Math.round(D.pooled_vol);
   });
 })();
 </script>
-</div>"""
+</div>
+</body>
+</html>"""
 
 open(os.path.join(HERE, "report.html"), "w", encoding="utf-8").write(
     HTML.replace("__DATA__", DATA).replace("__SG__", SG).replace("__PG__", PG))
 print("wrote report.html")
+
+# =====================================================================
+# Stage 5 - the simple, few-seconds landing page (index.html at repo root).
+# Same source data as the full report, so the headline numbers stay in sync.
+# =====================================================================
+p1 = persist[0]
+IDX = {
+    "no1":   f"{round(p1['no1'])}%",
+    "bot":   f"{round(p1['bot'])}%",
+    "top3":  f"{round(p1['top3'])}%",
+    "rank":  f"{p1['med_rank']}",
+    "n":     f"{p1['med_n']}",
+    "sg":    SG,   # קרן השתלמות · כללי, e.g. +0.15
+    "pg":    PG,   # קופת גמל · כללי, e.g. −0.39
+    "events": str(TOTAL_EVENTS),
+}
+
+INDEX = r"""<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>קופות שהובילו בתשואה — מה קרה להן אחר כך?</title>
+<style>
+:root{
+  --paper:#F4F6F8; --raised:#FFFFFF; --ink:#12171E; --muted:#5A6A7A; --faint:#8A97A3;
+  --line:#DDE3E9; --line2:#EAEEF2; --teal:#0E7C6B; --teal-d:#0B6153; --gold:#B57F14;
+  --clay:#B4472C; --shadow:0 1px 2px rgba(18,23,30,.04),0 10px 30px rgba(18,23,30,.07);
+}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#0F141A; --raised:#161D26; --ink:#EAEFF4; --muted:#9FB0BE; --faint:#6C7C8A;
+  --line:#28323D; --line2:#1E262F; --teal:#3BB39D; --teal-d:#2E9E89; --gold:#D9A63C;
+  --clay:#E0704F; --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 34px rgba(0,0,0,.4);
+}}
+:root[data-theme="dark"]{
+  --paper:#0F141A; --raised:#161D26; --ink:#EAEFF4; --muted:#9FB0BE; --faint:#6C7C8A;
+  --line:#28323D; --line2:#1E262F; --teal:#3BB39D; --teal-d:#2E9E89; --gold:#D9A63C;
+  --clay:#E0704F; --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 34px rgba(0,0,0,.4);
+}
+:root[data-theme="light"]{
+  --paper:#F4F6F8; --raised:#FFFFFF; --ink:#12171E; --muted:#5A6A7A; --faint:#8A97A3;
+  --line:#DDE3E9; --line2:#EAEEF2; --teal:#0E7C6B; --teal-d:#0B6153; --gold:#B57F14;
+  --clay:#B4472C; --shadow:0 1px 2px rgba(18,23,30,.04),0 10px 30px rgba(18,23,30,.07);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper)}
+body{color:var(--ink);
+  font-family:"Segoe UI","Arial Hebrew","Assistant","Heebo",system-ui,-apple-system,sans-serif;
+  line-height:1.7;font-size:18px;-webkit-font-smoothing:antialiased;
+  font-variant-numeric:tabular-nums;
+  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:48px 20px}
+.num{font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate}
+.card{width:100%;max-width:680px}
+.kicker{font-size:12.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--teal);
+  font-weight:700;margin-bottom:16px;text-align:center}
+h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spacing:-.01em;
+  margin:0 0 16px;text-align:center;text-wrap:balance}
+.lede{font-size:18px;color:var(--muted);margin:0 auto 8px;max-width:52ch;text-align:center}
+.divider{height:1px;background:var(--line);margin:34px 0 30px}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:0 0 8px}
+.stat{background:var(--raised);border:1px solid var(--line);border-radius:16px;
+  box-shadow:var(--shadow);padding:22px 16px;text-align:center}
+.stat .v{font-size:clamp(34px,7vw,44px);font-weight:800;line-height:1;letter-spacing:-.02em}
+.stat.a .v{color:var(--gold)} .stat.b .v{color:var(--clay)} .stat.c .v{color:var(--teal)}
+.stat .l{font-size:13.5px;color:var(--muted);margin-top:12px;line-height:1.45}
+@media(max-width:560px){.stats{grid-template-columns:1fr;gap:12px}
+  .stat{display:flex;align-items:center;gap:18px;text-align:start;padding:18px 20px}
+  .stat .v{font-size:38px} .stat .l{margin-top:0}}
+
+.takeaway{background:var(--raised);border:1px solid var(--line);border-radius:16px;
+  box-shadow:var(--shadow);padding:24px 26px;margin:26px 0 0;position:relative;overflow:hidden}
+.takeaway::before{content:"";position:absolute;inset-inline-start:0;top:0;bottom:0;
+  width:4px;background:var(--teal)}
+.takeaway p{margin:0;font-size:17px}
+.takeaway p + p{margin-top:12px}
+.takeaway b{font-weight:800}
+.neutral{margin:22px 0 30px;text-align:center;font-size:15px;color:var(--muted)}
+.neutral b{color:var(--ink);font-weight:700}
+
+.cta{display:flex;flex-direction:column;align-items:center;gap:14px}
+.btn{display:inline-flex;align-items:center;gap:10px;background:var(--teal);color:#fff;
+  text-decoration:none;font-size:17px;font-weight:700;padding:15px 30px;border-radius:999px;
+  box-shadow:var(--shadow);transition:background .15s,transform .15s}
+.btn:hover{background:var(--teal-d);transform:translateY(-1px)}
+.btn .ar{font-size:18px}
+.subnote{font-size:13px;color:var(--faint);text-align:center}
+.src{margin-top:36px;text-align:center;font-size:12.5px;color:var(--faint);line-height:1.7}
+.src b{color:var(--muted);font-weight:600}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="kicker">חיסכון ארוך טווח · נתוני רשות שוק ההון</div>
+  <h1>קופה הובילה בתשואה. כדאי לעבור אליה?</h1>
+  <p class="lede">בדקנו חוסך שבכל תחילת שנה מעביר את כספו לקופה שהשיגה את התשואה
+    הגבוהה ביותר בקטגוריה שלו אשתקד — ועקבנו מה קרה לאותה קופה בשנים שאחרי.</p>
+
+  <div class="divider"></div>
+
+  <div class="stats">
+    <div class="stat a">
+      <div class="v num">__NO1__</div>
+      <div class="l">בלבד מהמובילות חזרו למקום הראשון בשנה שאחרי</div>
+    </div>
+    <div class="stat b">
+      <div class="v num">__BOT__</div>
+      <div class="l">מהמובילות צנחו למחצית התחתונה כבר אחרי שנה</div>
+    </div>
+    <div class="stat c">
+      <div class="v num">≈0</div>
+      <div class="l">הפער השנתי במסלול הכללי — שם מרוכז רוב כספם של החוסכים</div>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <p>הקופה שהובילה אשתקד מדורגת בשנה שאחרי בממוצע סביב
+      <b>מקום <span class="num">__RANK__</span> מתוך <span class="num">~__N__</span></b> —
+      טובה מהממוצע, אך רחוקה מהמקום הראשון.</p>
+    <p>במסלולים <b>הכלליים</b> הפער בין "רודף" ל"נשאר" זעום ואף שלילי
+      (<span class="num">__SG__</span> נק' בקרן השתלמות, <span class="num">__PG__</span> נק'
+      בקופת גמל). הפערים הגדולים מופיעים דווקא במסלולי המניות ובפנסיה — היכן שהמובילה
+      נוטה להיות הקופה <b>המסוכנת יותר</b> בקבוצתה.</p>
+  </div>
+
+  <p class="neutral">זה לא ייעוץ ולא המלצה. <b>אלה העובדות — וההחלטה שלך.</b></p>
+
+  <div class="cta">
+    <a class="btn" href="analysis/report.html">
+      <span>למחקר המלא, לנתונים ולמתודולוגיה</span><span class="ar">←</span>
+    </a>
+    <div class="subnote">טבלאות שנה־אחר־שנה לכל קטגוריה · ניתוח סיכון · הקוד המלא</div>
+  </div>
+
+  <div class="src">
+    <span><b>מקור:</b> גמלנט · פנסיהנט (רשות שוק ההון)</span> ·
+    <span><b>תקופה:</b> <span class="num">2010–2025</span></span> ·
+    <span><b>היקף:</b> <span class="num">__EVENTS__</span> אירועי איתות, <span class="num">8</span> קטגוריות</span>
+  </div>
+</main>
+</body>
+</html>"""
+
+idx_out = INDEX
+for k, v in {"__NO1__":IDX["no1"], "__BOT__":IDX["bot"], "__RANK__":IDX["rank"],
+             "__N__":IDX["n"], "__SG__":IDX["sg"], "__PG__":IDX["pg"],
+             "__EVENTS__":IDX["events"]}.items():
+    idx_out = idx_out.replace(k, v)
+open(os.path.join(HERE, os.pardir, "index.html"), "w", encoding="utf-8").write(idx_out)
+print("wrote index.html")

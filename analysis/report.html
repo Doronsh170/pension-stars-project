@@ -1,4 +1,9 @@
-<div id="page" dir="rtl">
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מה קרה בפועל לקופות שהובילו בתשואה? — המחקר המלא</title>
 <style>
 :root{
   --paper:#F4F6F8; --raised:#FFFFFF; --ink:#12171E; --muted:#5A6A7A; --faint:#8A97A3;
@@ -27,6 +32,12 @@
   --shadow:0 1px 2px rgba(18,23,30,.04),0 8px 24px rgba(18,23,30,.06);
 }
 *{box-sizing:border-box}
+html,body{margin:0;background:var(--paper)}
+.backbar{max-width:860px;margin:0 auto;padding:20px 24px 0}
+.backbar a{display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:600;
+  color:var(--teal);text-decoration:none}
+.backbar a:hover{text-decoration:underline}
+.backbar .ar{font-size:16px}
 #page{background:var(--paper);color:var(--ink);
   font-family:"Segoe UI","Arial Hebrew","Assistant","Heebo",system-ui,-apple-system,sans-serif;
   line-height:1.7;font-size:17px;-webkit-font-smoothing:antialiased;
@@ -122,6 +133,10 @@ tr.closed td{color:var(--faint);font-style:italic}
 .foot code{background:var(--line2);padding:1px 6px;border-radius:5px;font-size:12px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
+</head>
+<body>
+<div id="page" dir="rtl">
+<div class="backbar"><a href="../index.html"><span class="ar">→</span> חזרה לתקציר</a></div>
 
 <div class="masthead"><div class="wrap">
   <div class="kicker">מחקר תיאורי · שוק החיסכון ארוך הטווח</div>
@@ -443,3 +458,5 @@ document.getElementById("volInline").textContent=Math.round(D.pooled_vol);
 })();
 </script>
 </div>
+</body>
+</html>
