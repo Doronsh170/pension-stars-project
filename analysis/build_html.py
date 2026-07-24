@@ -370,6 +370,13 @@ tr.closed td{color:var(--faint);font-style:italic}
     תשואה שנתית חושבה משרשור התשואות החודשיות; נכללו רק שנים עם 12 חודשי דיווח.
     הסימולציה הכספית אינה מנכה דמי ניהול, מס ועלויות מעבר.
   </div>
+  <div class="foot" style="border-top:none;padding-top:0;margin-top:12px">
+    <b>גילוי נאות:</b> התוכן נועד למידע כללי ולמטרות לימודיות בלבד, ואינו מהווה ייעוץ
+    או שיווק פנסיוני או השקעות ואינו תחליף לייעוץ אישי המתחשב בנתוניו ובצרכיו של כל אדם.
+    הנתונים מבוססים על מקורות פומביים (גמלנט ופנסיהנט) וייתכנו בהם אי־דיוקים.
+    ביצועי עבר אינם מעידים על העתיד.
+    <div style="margin-top:10px">מאת: דורון שרייבמן</div>
+  </div>
 </div>
 
 <script>
@@ -760,6 +767,9 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
 .subnote{font-size:13px;color:var(--faint);text-align:center}
 .src{margin-top:36px;text-align:center;font-size:12.5px;color:var(--faint);line-height:1.7}
 .src b{color:var(--muted);font-weight:600}
+.disclaimer{margin:22px auto 0;max-width:60ch;text-align:center;font-size:11.5px;
+  color:var(--faint);line-height:1.65}
+.credit{margin:9px 0 0;text-align:center;font-size:11.5px;color:var(--faint)}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -838,6 +848,11 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
     <span><b>תקופה:</b> <span class="num">2010–2025</span></span> ·
     <span><b>היקף:</b> <span class="num">__EVENTS__</span> אירועי איתות, <span class="num">8</span> קטגוריות</span>
   </div>
+  <p class="disclaimer">גילוי נאות: התוכן נועד למידע כללי ולמטרות לימודיות בלבד, ואינו
+    מהווה ייעוץ או שיווק פנסיוני או השקעות ואינו תחליף לייעוץ אישי המתחשב בנתוניו ובצרכיו
+    של כל אדם. הנתונים מבוססים על מקורות פומביים (גמלנט ופנסיהנט) וייתכנו בהם אי־דיוקים.
+    ביצועי עבר אינם מעידים על העתיד.</p>
+  <p class="credit">מאת: דורון שרייבמן</p>
 </main>
 </body>
 </html>"""
