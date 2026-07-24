@@ -596,6 +596,40 @@ def _split_chart(rows):
     out.append('</svg>')
     return "".join(out)
 
+# ---- a concrete illustration: the top-3 leaders of one category in one year,
+#      and where each landed the year after. Computed from annual_returns.csv with
+#      the same ranking rule as the study (12 complete months, sorted by return),
+#      so names and places stay exact and in sync. 2017 in the flagship track is a
+#      fair, non-extreme case: two of the three leaders slipped below the median
+#      the next year while one held the top quarter. ----
+EX_CAT, EX_YEAR = 'קרנות השתלמות | כללי', "2017"
+_ar = list(csv.DictReader(open(os.path.join(HERE, "annual_returns.csv"), encoding="utf-8-sig")))
+_byyear = defaultdict(list)
+for r in _ar:
+    if r["category"] == EX_CAT and int(r["n_months"]) == 12:
+        _byyear[r["year"]].append((r["fund_id"], r["fund_name"], float(r["annual_return"])))
+def _rank_map(funds):
+    s = sorted(funds, key=lambda x: -x[2])
+    return {f[0]: i + 1 for i, f in enumerate(s)}, len(s), s
+_next = str(int(EX_YEAR) + 1)
+_, _n_sig, _s_sig = _rank_map(_byyear[EX_YEAR])
+_nrank, _n_next, _ = _rank_map(_byyear[_next])
+def _rank_cls(rank, n):
+    if rank <= (n + 3) // 4: return "top"
+    if rank > n / 2: return "low"
+    return "mid"
+_ex = []
+for fid, name, ret in _s_sig[:3]:
+    rk = _nrank.get(fid)
+    if rk is None:
+        nxt = '<span class="ex-next low">נסגרה או מוזגה</span>'
+    else:
+        nxt = f'<span class="ex-next {_rank_cls(rk, _n_next)}">מקום {rk} מתוך {_n_next}</span>'
+    _ex.append(f'<div class="ex-row"><span class="ex-name">{name}</span>'
+               f'<span class="ex-sig num">{ret:+.1f}%</span>'
+               f'<span class="ex-arrow">←</span>{nxt}</div>')
+EX_ROWS = "".join(_ex)
+
 IDX = {
     "no1":   f"{round(p1['no1'])}%",
     "bot":   f"{round(p1['bot'])}%",
@@ -607,6 +641,7 @@ IDX = {
     "van3":  f"{round(persist[2]['vanished'])}%",
     "events": str(TOTAL_EVENTS),
     "chart": _split_chart(persist),
+    "ex_label": label(EX_CAT), "ex_year": EX_YEAR, "ex_next": _next, "ex_rows": EX_ROWS,
 }
 
 INDEX = r"""<!doctype html>
@@ -677,6 +712,20 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
 .legend span{display:inline-flex;align-items:center;gap:7px}
 .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
 
+.example{background:var(--raised);border:1px solid var(--line);border-radius:16px;
+  box-shadow:var(--shadow);padding:22px 24px;margin:22px 0 0}
+.example .sec-eyebrow{text-align:start;margin-bottom:12px}
+.ex-intro{margin:0 0 14px;font-size:15.5px}
+.ex-list{display:flex;flex-direction:column;gap:8px}
+.ex-row{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;
+  padding:10px 14px;background:var(--paper);border:1px solid var(--line2);border-radius:10px}
+.ex-name{flex:1 1 170px;font-weight:600;font-size:14.5px}
+.ex-sig{font-size:14px;color:var(--gold);font-weight:700}
+.ex-arrow{color:var(--faint);font-size:15px}
+.ex-next{font-size:14px;font-weight:700;color:var(--muted)}
+.ex-next.top{color:var(--teal)} .ex-next.low{color:var(--clay)}
+.ex-note{margin:14px 0 0;font-size:13px;color:var(--faint)}
+
 .summary{background:var(--raised);border:1px solid var(--line);border-radius:16px;
   box-shadow:var(--shadow);padding:24px 26px;margin:26px 0 30px;position:relative;overflow:hidden}
 .summary::before{content:"";position:absolute;inset-inline-start:0;top:0;bottom:0;
@@ -737,6 +786,15 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
       בשנה הראשונה לכ־<span class="num">__VAN3__</span> עד השנה השלישית.</div>
   </div>
 
+  <div class="example">
+    <div class="sec-eyebrow teal">דוגמה מוחשית · __EX_LABEL__</div>
+    <p class="ex-intro">שלוש הקופות שהובילו בתשואה בשנת <span class="num">__EX_YEAR__</span>,
+      והמקום שבו דורגו שנה לאחר מכן (<span class="num">__EX_NEXT__</span>):</p>
+    <div class="ex-list">__EX_ROWS__</div>
+    <p class="ex-note">שנה אחת, להמחשה בלבד — במחקר המלא יש גם שנים שבהן מובילות שמרו על
+      מקומן, לצד הרשימה המלאה בכל הקטגוריות.</p>
+  </div>
+
   <section class="summary">
     <div class="sec-eyebrow teal">מה נראה מהנתונים — בזהירות</div>
     <p>מובילות העבר שומרות על מעמדן באופן חלקי וזמני בלבד: רק מיעוט חוזרות לצמרת, ורבות
@@ -771,7 +829,9 @@ idx_out = INDEX
 for k, v in {"__NO1__":IDX["no1"], "__BOT__":IDX["bot"], "__RANK__":IDX["rank"],
              "__N__":IDX["n"], "__SG__":IDX["sg"], "__PG__":IDX["pg"],
              "__VAN1__":IDX["van1"], "__VAN3__":IDX["van3"],
-             "__EVENTS__":IDX["events"], "__CHART__":IDX["chart"]}.items():
+             "__EVENTS__":IDX["events"], "__CHART__":IDX["chart"],
+             "__EX_LABEL__":IDX["ex_label"], "__EX_YEAR__":IDX["ex_year"],
+             "__EX_NEXT__":IDX["ex_next"], "__EX_ROWS__":IDX["ex_rows"]}.items():
     idx_out = idx_out.replace(k, v)
 open(os.path.join(HERE, os.pardir, "index.html"), "w", encoding="utf-8").write(idx_out)
 print("wrote index.html")
