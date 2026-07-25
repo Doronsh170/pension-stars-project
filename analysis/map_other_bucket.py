@@ -12,6 +12,7 @@ LABEL_RISK = {
     'כספי': 'נמוכה',
     'הלכתי': 'בינונית',
     'מעורב / גמיש': 'בינונית',
+    'מבטיח תשואה': 'נמוכה',   # its own category, not folded into gov bonds
 }
 
 EXCLUDE = '__EXCLUDE_IRA__'
@@ -36,7 +37,7 @@ def classify(name, spec, sub):
     # 1) Age / lifecycle bands (by name, overrides spec/sub)
     if 'לבני 50 ומטה' in n or 'לגילאי 50 ומטה' in n or 'גילאי 50 ומטה' in n \
             or ('עד 50' in n and ('מסלול' in n or 'מדרגות' in n or 'מסלולית' in n or spec in ('מדרגות', 'מתמחה אחר'))):
-        return 'מניות אקטיבי'           # youngest band = most aggressive (גבוהה)
+        return 'כללי'                    # under-50 band -> כללי (per user)
     if 'בין 50 ל-60' in n or 'בין 50 ל 60' in n:
         return 'כללי'                    # matches existing מדרגות/50-60 -> כללי
     if '60 פלוס' in n or '60 ומעלה' in n or 'מסלול 60' in n:
@@ -50,9 +51,9 @@ def classify(name, spec, sub):
             return 'אג"ח ללא מניות'
         return 'כללי'
 
-    # 3) Guaranteed return
+    # 3) Guaranteed return -> its own category (not folded into gov bonds)
     if spec == 'מבטיח תשואה':
-        return 'אג"ח ממשלתי'
+        return 'מבטיח תשואה'
 
     # 4) Foreign currency (מט"ח) -> money-market-like
     if spec == 'מט"ח':
