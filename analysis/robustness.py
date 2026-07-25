@@ -63,7 +63,7 @@ def collect():
     rand1 = {k: [] for k in (1, 2, 3)}           # random baseline 1/n for "still #1"
     diffs = []          # per consecutive year: dict(family, gap, winner_vanished)
 
-    for domain in ("gemel", "pension"):
+    for domain in ("gemel",):
         for cat in ca.CATEGORIES[domain]:
             years = data.get((domain, cat), {})
             valid = sorted(y for y, f in years.items() if len(f) >= ca.MIN_FUNDS)
@@ -170,7 +170,7 @@ def main():
 
     print("-- main (vanished winner falls back to category average) --")
     report("ALL", diffs)
-    for fam in ("קרן השתלמות", "קופת גמל", "קרן פנסיה"):
+    for fam in ("קרן השתלמות", "קופת גמל"):
         report(fam, [d for d in diffs if d["family"] == fam])
     print("-- per category (headline claim is about the 'כללי' tracks) --")
     for lab in sorted({d["label"] for d in diffs}):
