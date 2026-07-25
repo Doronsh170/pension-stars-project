@@ -17,7 +17,7 @@ import openpyxl
 
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
 SOURCES = [
-    ("gemel-merged-2010-2025.xlsx", "‏‏צרף1", "gemel"),
+    ("gemel-mapped-2010-2025.xlsx", "ראשי", "gemel"),
 ]
 
 # (domain,fund_id,year) -> {month: (equity_pct, std)}
@@ -27,11 +27,15 @@ for fname, sheet, domain in SOURCES:
     ws = wb[sheet]; it = ws.iter_rows(values_only=True); h = list(next(it))
     idx = {x: i for i, x in enumerate(h)}
     se = idx.get('STOCK_MARKET_EXPOSURE'); sd = idx.get('STANDARD_DEVIATION')
-    ta = idx.get('TOTAL_ASSETS'); fi = idx['FUND_ID']; pi = idx['REPORT_PERIOD']
+    ta = idx.get('TOTAL_ASSETS'); fi = idx['FUND_ID']
+    pi = idx.get('REPORT_PERIOD'); pi = pi if pi is not None else idx['תקופת דיווח']
     for r in it:
         p = r[pi]
         if not p: continue
-        p = str(p); y = int(p[:4]); mo = int(p[4:6])
+        if hasattr(p, "year"):
+            y, mo = p.year, p.month
+        else:
+            p = str(p); y = int(p[:4]); mo = int(p[4:6])
         eq = None
         if se is not None and ta is not None and r[se] is not None and r[ta] not in (None, 0):
             try: eq = float(r[se]) / float(r[ta]) * 100
