@@ -34,6 +34,42 @@ def norm(s):
     return " ".join(str(s).split()).strip()
 
 
+# --- track refinement inside the two provident families -------------------
+# The regulator's SPECIALIZATION for stocks/general is coarse, and a number of
+# single-index tracker products ("קרנות סל" / "מחקות מדד" / Phoenix's "שיטת
+# הפניקס" index line) are filed under the *general* ("כללי") track even though
+# they hold a single asset (a bond index at ~0% equity, or ת"א 25 at ~98%).
+# They are not diversified general funds and even topped the general track in
+# 2014-2015, so we drop them from "כללי". Genuine conservative general funds
+# (e.g. "מסלול קלאסי", "עד 10% מניות") are kept.
+_TRACKER_MARKS = ("סל עוקב", "מחקה מדד", "עוקב מדד", "שיטת הפניקס")
+
+
+def is_index_tracker(name):
+    name = name or ""
+    return any(m in name for m in _TRACKER_MARKS)
+
+
+# Stock funds ("מניות") are split by geography read from the fund name, because
+# the regulator does not carry it as a field for most of them. Foreign/global
+# and Israel index products are separated out from the plain "מניות" mandate
+# funds; the small geo buckets fall below the study's fund-count threshold and
+# drop out on their own, leaving an actively-managed general-stock track.
+_FOREIGN_MARKS = ('חו"ל', "חו”ל", "s&p", "s$p", "s1;p", "msci", "נאסד", "nasdaq",
+                  "עולמי", "גלובל", "global", "world", "דאו", "יורוסטוק",
+                  "אירופ", 'ארה"ב', "מפותח", "מתעורר", "ג'ונס")
+_ISRAEL_MARKS = ('ת"א', "ת”א", "תל אביב", "ישראל")
+
+
+def stock_geo(name):
+    low = (name or "").lower()
+    if any(m in low for m in _FOREIGN_MARKS):
+        return 'חו"ל'
+    if any(m in (name or "") for m in _ISRAEL_MARKS):
+        return "ישראל"
+    return "כללי"
+
+
 def load_rows():
     """Yield (domain, fund_id, fund_name, classification, specialization, year, month, monthly_yield)."""
     for fname, sheet, domain in SOURCES:
@@ -113,11 +149,22 @@ def main():
                 if m in months:
                     comp *= (1 + months[m] / 100.0)
             annual = (comp - 1) * 100.0
-            # category: pension -> classification; gemel -> classification | specialization
+            # category: pension -> classification; gemel -> classification | track.
+            # Within gemel we refine the track: single-index trackers are dropped
+            # from "כללי", and "מניות" is split by geography (see helpers above).
             if domain == "pension":
                 category = d["cls"]
             else:
-                category = d["cls"] if not d["spec"] else f'{d["cls"]} | {d["spec"]}'
+                spec = d["spec"]
+                if spec == "כללי" and is_index_tracker(d["name"]):
+                    continue  # single-index tracker mislabeled as a general fund
+                if spec == "מניות":
+                    track = f'מניות · {stock_geo(d["name"])}'
+                elif spec:
+                    track = spec
+                else:
+                    track = None
+                category = f'{d["cls"]} | {track}' if track else d["cls"]
             w.writerow([domain, fid, d["name"], d["cls"], d["spec"], category,
                         year, round(annual, 4), n])
     print("wrote", out_path)
