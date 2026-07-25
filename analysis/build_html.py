@@ -42,6 +42,8 @@ def label(c):
 def hstats(k):
     ranks=[]; ns=[]; pct=[]; normpos=[]; present=absent=total=0
     still1=top3=topq=half=bot=0
+    # disjoint partition of ALL winners (sums to total): where did each end up?
+    s_no1=s_topq=s_half=s_bot=0
     for e in events:
         st=e.get(f"y{k}_status")
         if st in ("present","absent"): total+=1
@@ -55,6 +57,12 @@ def hstats(k):
         if rk<=max(1,round(n/4)): topq+=1
         if rk<=n/2: half+=1
         else: bot+=1
+        # disjoint bucket
+        q=max(1,round(n/4))
+        if rk==1: s_no1+=1
+        elif rk<=q: s_topq+=1
+        elif rk<=n/2: s_half+=1
+        else: s_bot+=1
     r1=lambda x:round(x,1)
     return {"h":k,"present":present,"total":total,
         "med_rank":round(statistics.median(ranks)),"med_n":round(statistics.median(ns)),
@@ -62,7 +70,11 @@ def hstats(k):
         "pctile":r1(statistics.mean(pct)),"med_pctile":r1(statistics.median(pct)),
         "no1":r1(still1/present*100),"top3":r1(top3/present*100),"topq":r1(topq/present*100),
         "half":r1(half/present*100),"bot":r1(bot/present*100),
-        "vanished":r1(absent/total*100)}
+        "vanished":r1(absent/total*100),
+        # disjoint partition as % of ALL winners (no1+topq+half+bot+closed = 100)
+        "seg":{"no1":r1(s_no1/total*100),"topq":r1(s_topq/total*100),
+               "half":r1(s_half/total*100),"bot":r1(s_bot/total*100),
+               "closed":r1(absent/total*100)}}
 persist=[hstats(k) for k in (1,2,3)]
 TOTAL_EVENTS=persist[0]["total"]
 
@@ -277,10 +289,12 @@ tr.closed td{color:var(--faint);font-style:italic}
       הקטגוריה, וכ־<span class="em" id="s_van">10%</span> כלל לא שרדו כקופה נפרדת (נסגרו
       או מוזגו). לאורך זמן שיעור החזרה למקום הראשון יורד ושיעור ההיעלמות עולה.</p>
     <div class="figure">
-      <div class="cap">שיעור המובילות שנשארו במקום 1, בשלושת הראשונים, ברבעון העליון,
-        או שירדו למחצית התחתונה / חדלו להתקיים, לאחר 1, 2 ו־3 שנים.</div>
-      <svg id="chartKeep" viewBox="0 0 720 340" role="img"
-        aria-label="שמירת מעמד של המובילות לאורך שלוש שנים"></svg>
+      <div class="cap">לאן הגיעה מובילת אשתקד: פילוח מלא (100%) של כלל המובילות לפי
+        מיקומן בקטגוריה לאחר שנה, שנתיים ושלוש. כל פס מתחלק לחמישה מצבים נפרדים
+        (מימין לשמאל: מהטוב לפחות טוב).</div>
+      <svg id="chartKeep" viewBox="0 0 720 260" role="img"
+        aria-label="פילוח מיקום המובילות לאורך שלוש שנים"></svg>
+      <div class="legend" id="keepLegend"></div>
     </div>
   </section>
 
@@ -417,42 +431,38 @@ function txt(x,y,s,o={}){const t=el("text",{x,y,...o});t.textContent=s;return t;
     "מקום "+p1.med_rank+" מתוך ~"+p1.med_n;
 })();
 
-/* ---- Q1: keep-status grouped bars (share %, per horizon) ---- */
+/* ---- Q1: where did last year's #1 end up? 100% stacked partition ---- */
 (function(){
   const svg=document.getElementById("chartKeep");
-  const W=720,H=340,mL=40,mR=16,mT=16,mB=44;
-  const iw=W-mL-mR, ih=H-mT-mB;
-  const groups=[
-    {k:"no1",lab:"מקום 1",col:css("--gold")},
-    {k:"top3",lab:"שלושה ראשונים",col:css("--teal")},
-    {k:"topq",lab:"רבעון עליון",col:css("--teal")},
-    {k:"bot",lab:"מחצית תחתונה",col:css("--clay")},
-    {k:"vanished",lab:"נסגרו/מוזגו",col:css("--base")},
+  const segs=[
+    {v:d=>d.seg.no1,             lab:"חזרו למקום 1",       col:css("--gold")},
+    {v:d=>d.seg.topq+d.seg.half, lab:"שאר המחצית העליונה", col:css("--teal")},
+    {v:d=>d.seg.bot,             lab:"ירדו למחצית התחתונה",col:css("--clay")},
+    {v:d=>d.seg.closed,          lab:"נסגרו / מוזגו",      col:css("--base")},
   ];
-  const y=v=>mT+ih*(1-v/100);
-  [0,25,50,75,100].forEach(g=>{
-    svg.appendChild(el("line",{x1:mL,x2:W-mR,y1:y(g),y2:y(g),stroke:css("--line"),"stroke-width":1}));
-    svg.appendChild(txt(mL-8,y(g)+4,g+"%",{fill:css("--faint"),"font-size":10.5,"text-anchor":"end"}));
-  });
-  const gw=iw/groups.length;
-  groups.forEach((g,gi)=>{
-    const gx=mL+gw*gi, bw=gw*0.2, pad=gw*0.1;
-    D.persist.forEach((d,hi)=>{
-      const v=d[g.k]; const bx=gx+pad+bw*hi+ (gw*0.06)*hi;
-      svg.appendChild(el("rect",{x:bx,y:y(v),width:bw,height:mT+ih-y(v),rx:2.5,
-        fill:g.col,opacity:0.45+0.27*hi}));
-      svg.appendChild(txt(bx+bw/2,y(v)-5,Math.round(v),{fill:g.col,"font-size":10.5,
-        "font-weight":700,"text-anchor":"middle"}));
+  const W=720, top=16, rowH=46, gap=30, R=W-124, L=54, TW=R-L;
+  const H=top+D.persist.length*(rowH+gap);
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const hlab=["אחרי שנה","אחרי שנתיים","אחרי 3 שנים"];
+  D.persist.forEach((d,i)=>{
+    const y=top+i*(rowH+gap);
+    svg.appendChild(txt(W-12,y+rowH/2+5,hlab[i],{fill:css("--ink"),"font-size":13.5,
+      "font-weight":700,"text-anchor":"start"}));       // rtl: right-aligned
+    let xr=R;                                            // stack from the right (best) leftward
+    segs.forEach(s=>{
+      const v=s.v(d); if(v<=0) return;
+      const w=v/100*TW, xl=xr-w;
+      svg.appendChild(el("rect",{x:xl,y:y,width:w,height:rowH,fill:s.col,
+        opacity:0.96,stroke:css("--raised"),"stroke-width":1}));
+      if(w>24) svg.appendChild(txt((xl+xr)/2,y+rowH/2+5,Math.round(v)+"%",
+        {fill:"#fff","font-size":13,"font-weight":800,"text-anchor":"middle",style:"direction:ltr"}));
+      xr=xl;
     });
-    svg.appendChild(txt(gx+gw/2,H-mB+18,g.lab,{fill:css("--ink"),"font-size":12,
-      "font-weight":600,"text-anchor":"middle"}));
   });
-  // horizon legend
-  const lx=mL+4; ["+1 שנה","+2 שנים","+3 שנים"].forEach((t,i)=>{
-    const cx=lx+i*92;
-    svg.appendChild(el("rect",{x:cx,y:H-14,width:11,height:11,rx:2,fill:css("--muted"),opacity:0.45+0.27*i}));
-    svg.appendChild(txt(cx+16,H-4,t,{fill:css("--muted"),"font-size":11,"text-anchor":"start"}));
-  });
+  // HTML legend (avoids the old cramped in-chart legend)
+  const lg=document.getElementById("keepLegend");
+  lg.innerHTML=segs.map(s=>
+    `<span><i class="dot" style="background:${s.col}"></i> ${s.lab}</span>`).join("");
 })();
 
 /* ---- Q2: percentile line (mean + median) ---- */
