@@ -31,11 +31,10 @@ HORIZONS = (1, 2, 3)
 FIRST_YEAR = 2010           # study focuses on signal years from 2010 onward
 LAST_COMPLETE_YEAR = 2025   # 2026 is only a partial year in the raw data
 
-# Categories we study, grouped into three product families that a saver
+# Categories we study, grouped into the two provident-fund families that a saver
 # actually chooses between. Provident (קופת גמל) and study (קרן השתלמות) are
 # kept strictly separate. Within each we compare like-with-like tracks.
 CATEGORIES = {
-    "pension": ["קרנות חדשות", "קרנות כלליות"],
     "gemel": [
         # קרן השתלמות
         'קרנות השתלמות | כללי',
@@ -95,7 +94,7 @@ def main():
     cat_rows = []
     strat_rows = []
 
-    for domain in ("gemel", "pension"):
+    for domain in ("gemel",):
         for cat in CATEGORIES[domain]:
             key = (domain, cat)
             years = data.get(key, {})

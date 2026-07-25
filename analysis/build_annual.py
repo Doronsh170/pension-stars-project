@@ -19,13 +19,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
 # (file, sheet, domain)
+# Single consolidated provident-fund table (gemel + study funds), 2010-2025,
+# supplied as one sheet. The study is provident-only; pension funds are not in
+# this source. The pipeline still applies the public-access / IRA / sick-pay
+# filters below, so the exact fund pool is unchanged from the earlier run.
 SOURCES = [
-    ("gemel-net1999-2022.xlsx", "gemel-net1999-2022", "gemel"),
-    ("gemel-net2023.xlsx",      "gemel-net2023",      "gemel"),
-    ("2024-2026גמל.xlsx",       "file",               "gemel"),
-    ("pensia-net1999-2022.xlsx","pensia-net1999-2022","pension"),
-    ("pensia-net2023.xlsx",     "pensia-net2023",     "pension"),
-    ("2024-2026פנסיה.xlsx",     "file (1)",           "pension"),
+    ("gemel-merged-2010-2025.xlsx", "‏‏צרף1", "gemel"),
 ]
 
 
