@@ -42,6 +42,8 @@ def label(c):
 def hstats(k):
     ranks=[]; ns=[]; pct=[]; normpos=[]; present=absent=total=0
     still1=top3=topq=half=bot=0
+    # disjoint partition of ALL winners (sums to total): where did each end up?
+    s_no1=s_topq=s_half=s_bot=0
     for e in events:
         st=e.get(f"y{k}_status")
         if st in ("present","absent"): total+=1
@@ -55,6 +57,12 @@ def hstats(k):
         if rk<=max(1,round(n/4)): topq+=1
         if rk<=n/2: half+=1
         else: bot+=1
+        # disjoint bucket
+        q=max(1,round(n/4))
+        if rk==1: s_no1+=1
+        elif rk<=q: s_topq+=1
+        elif rk<=n/2: s_half+=1
+        else: s_bot+=1
     r1=lambda x:round(x,1)
     return {"h":k,"present":present,"total":total,
         "med_rank":round(statistics.median(ranks)),"med_n":round(statistics.median(ns)),
@@ -62,7 +70,11 @@ def hstats(k):
         "pctile":r1(statistics.mean(pct)),"med_pctile":r1(statistics.median(pct)),
         "no1":r1(still1/present*100),"top3":r1(top3/present*100),"topq":r1(topq/present*100),
         "half":r1(half/present*100),"bot":r1(bot/present*100),
-        "vanished":r1(absent/total*100)}
+        "vanished":r1(absent/total*100),
+        # disjoint partition as % of ALL winners (no1+topq+half+bot+closed = 100)
+        "seg":{"no1":r1(s_no1/total*100),"topq":r1(s_topq/total*100),
+               "half":r1(s_half/total*100),"bot":r1(s_bot/total*100),
+               "closed":r1(absent/total*100)}}
 persist=[hstats(k) for k in (1,2,3)]
 TOTAL_EVENTS=persist[0]["total"]
 
@@ -216,12 +228,16 @@ summary::-webkit-details-marker{display:none}
 summary .chev{color:var(--faint);transition:transform .2s;font-size:13px}
 details[open] summary .chev{transform:rotate(90deg)}
 summary:hover{background:var(--line2)}
-.tbl-scroll{overflow-x:auto;border-top:1px solid var(--line)}
-table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px}
-th,td{padding:9px 12px;text-align:start;border-bottom:1px solid var(--line2);white-space:nowrap}
-thead th{font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);
-  font-weight:700;position:sticky;top:0;background:var(--raised)}
-td.name{white-space:normal;min-width:200px;color:var(--muted)}
+.tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border-top:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:0;table-layout:fixed}
+th,td{padding:8px 8px;text-align:start;border-bottom:1px solid var(--line2);vertical-align:top}
+thead th{font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:var(--faint);
+  font-weight:700;position:sticky;top:0;background:var(--raised);white-space:nowrap}
+td.name{white-space:normal;color:var(--muted);line-height:1.35;word-break:break-word}
+/* compact, fixed column widths so all six columns fit without clipping */
+col.c-year{width:8%} col.c-name{width:30%} col.c-sig{width:12%}
+col.c-follow{width:16.66%}
+td .cell{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}
 td.y{font-weight:700;color:var(--gold)}
 .pill{display:inline-flex;gap:5px;align-items:center;font-variant-numeric:tabular-nums;direction:ltr}
 .rk{font-size:11px;color:var(--faint)}
@@ -277,10 +293,12 @@ tr.closed td{color:var(--faint);font-style:italic}
       הקטגוריה, וכ־<span class="em" id="s_van">10%</span> כלל לא שרדו כקופה נפרדת (נסגרו
       או מוזגו). לאורך זמן שיעור החזרה למקום הראשון יורד ושיעור ההיעלמות עולה.</p>
     <div class="figure">
-      <div class="cap">שיעור המובילות שנשארו במקום 1, בשלושת הראשונים, ברבעון העליון,
-        או שירדו למחצית התחתונה / חדלו להתקיים, לאחר 1, 2 ו־3 שנים.</div>
-      <svg id="chartKeep" viewBox="0 0 720 340" role="img"
-        aria-label="שמירת מעמד של המובילות לאורך שלוש שנים"></svg>
+      <div class="cap">לאן הגיעה מובילת אשתקד: פילוח מלא (100%) של כלל המובילות לפי
+        מיקומן בקטגוריה לאחר שנה, שנתיים ושלוש. כל פס מתחלק לחמישה מצבים נפרדים
+        (מימין לשמאל: מהטוב לפחות טוב).</div>
+      <svg id="chartKeep" viewBox="0 0 720 260" role="img"
+        aria-label="פילוח מיקום המובילות לאורך שלוש שנים"></svg>
+      <div class="legend" id="keepLegend"></div>
     </div>
   </section>
 
@@ -321,33 +339,31 @@ tr.closed td{color:var(--faint);font-style:italic}
       <svg id="chartGap" viewBox="0 0 720 430" role="img"
         aria-label="פער התשואה בין רדיפה להישארות לפי קטגוריה"></svg>
     </div>
-    <p class="body"><b>(ב) הקשר לסיכון.</b> המובילה יושבת בממוצע באחוזון תנודתיות
-      <span class="emteal" id="volInline">67</span> בתוך הקטגוריה, והיא נוטה להיות מהקופות
-      המסוכנות יותר בקבוצתה (במסלולי המניות: לא פעם מסלולי מדד או עוקבי
-      <span class="num">S&P 500</span>). מאחר שהתקופה כללה בעיקר שנים של עליות, קופות
-      בעלות חשיפה מנייתית גבוהה השיגו בממוצע תשואות גבוהות יותר, כך שהפער הכספי שבסעיף
-      (א) קשור במידה רבה לרמת הסיכון, ולא בהכרח להתמדה של ביצועים.</p>
+    <p class="body"><b>(ב) הקשר לסיכון.</b> <b>איך מדדנו סיכון?</b> לכל קופה יש
+      <b>סטיית תקן</b> — מדד לתנודתיות: כמה התשואה שלה "קופצת" מעלה ומטה. לכל קופה מובילה
+      בדקנו היכן היא ממוקמת בתוך הקטגוריה שלה במונחי תנודתיות, בסולם אחוזון:
+      <span class="num">50</span> = תנודתיות ממוצעת לקטגוריה, <span class="num">100</span> =
+      הקופה התנודתית (המסוכנת) ביותר בקבוצה. המובילה יושבת בממוצע באחוזון
+      <span class="emteal" id="volInline">67</span> — כלומר נוטה להיות מהתנודתיות יותר
+      בקבוצתה (במסלולי המניות: לא פעם עוקבי <span class="num">S&P 500</span>). מאחר
+      שהתקופה כללה בעיקר שנים של עליות, קופות מסוכנות יותר השיגו בממוצע תשואות גבוהות
+      יותר — כך שהפער הכספי שבסעיף (א) קשור במידה רבה לרמת הסיכון, ולא בהכרח להתמדה של ביצועים.</p>
     <div class="figure">
-      <div class="cap">אחוזון התנודתיות של המובילה בתוך הקטגוריה (50 = ללא הטיה, 100 = המסוכנת ביותר).</div>
+      <div class="cap">אחוזון התנודתיות (סטיית התקן) של המובילה בתוך הקטגוריה
+        (50 = תנודתיות ממוצעת, 100 = המסוכנת ביותר בקבוצה).</div>
       <svg id="chartRisk" viewBox="0 0 720 400" role="img"
         aria-label="אחוזון התנודתיות של המובילות לפי קטגוריה"></svg>
     </div>
   </section>
 
   <section>
-    <div class="eyebrow">אמינות · בדיקת מובהקות</div>
-    <h2>עד כמה הממצאים מוצקים?</h2>
-    <p class="body">לא הסתפקנו בממוצעים, אלא בדקנו כמה מהם עמידים סטטיסטית (מבחני
-      bootstrap; המספרים המלאים ורווחי הסמך בקובץ <code>robustness.py</code>).</p>
-    <p class="body"><b>ההתמדה קטנה ולא יציבה.</b> היתרון של מובילת אשתקד על פני ממוצע
-      הקטגוריה קטן, ולרוב אינו חורג בבירור מגבול המקריות; הוא אינו עקבי לאורך זמן ונעלם
-      בתוך שלוש שנים.</p>
-    <p class="body"><b>והוא תלוי בקופות ששרדו.</b> כאשר מכניסים לחשבון גם את הקופות
-      שנסגרו או מוזגו, היתרון נעלם. כלומר הוא מופיע רק אם מתעלמים מהן.</p>
-    <p class="body"><b>במסלולים הכלליים אין הבדל של ממש.</b> הפער הכספי בין "רודף"
-      ל"נשאר" במסלולים הכלליים (קרן השתלמות כללי, קופת גמל כללי) אינו שונה סטטיסטית
-      מאפס. הפער המובהק היחיד הוא במסלול המניות של קרן ההשתלמות, שהוא גם מהמסוכנים יותר,
-      כך שהוא עולה בקנה אחד עם פרמיית סיכון בתקופת שווקים עולים.</p>
+    <div class="eyebrow">אמינות</div>
+    <h2>עד כמה הממצא מוצק?</h2>
+    <p class="body">בדקנו אם התוצאות אמיתיות או סתם "מזל" אקראי. בקצרה:
+      <b>היתרון של מובילת אשתקד קטן, לא יציב, ונעלם בתוך שלוש שנים</b> — ובמסלולים
+      הכלליים, שבהם מרוכז רוב הכסף, כמעט שאין הבדל בין "רודף" ל"נשאר". חשוב מכך:
+      היתרון מופיע רק כשמתעלמים מהקופות שנסגרו בדרך; מרגע שמכניסים גם אותן לחשבון,
+      הוא נעלם.</p>
   </section>
 
   <section>
@@ -417,42 +433,38 @@ function txt(x,y,s,o={}){const t=el("text",{x,y,...o});t.textContent=s;return t;
     "מקום "+p1.med_rank+" מתוך ~"+p1.med_n;
 })();
 
-/* ---- Q1: keep-status grouped bars (share %, per horizon) ---- */
+/* ---- Q1: where did last year's #1 end up? 100% stacked partition ---- */
 (function(){
   const svg=document.getElementById("chartKeep");
-  const W=720,H=340,mL=40,mR=16,mT=16,mB=44;
-  const iw=W-mL-mR, ih=H-mT-mB;
-  const groups=[
-    {k:"no1",lab:"מקום 1",col:css("--gold")},
-    {k:"top3",lab:"שלושה ראשונים",col:css("--teal")},
-    {k:"topq",lab:"רבעון עליון",col:css("--teal")},
-    {k:"bot",lab:"מחצית תחתונה",col:css("--clay")},
-    {k:"vanished",lab:"נסגרו/מוזגו",col:css("--base")},
+  const segs=[
+    {v:d=>d.seg.no1,             lab:"חזרו למקום 1",       col:css("--gold")},
+    {v:d=>d.seg.topq+d.seg.half, lab:"שאר המחצית העליונה", col:css("--teal")},
+    {v:d=>d.seg.bot,             lab:"ירדו למחצית התחתונה",col:css("--clay")},
+    {v:d=>d.seg.closed,          lab:"נסגרו / מוזגו",      col:css("--base")},
   ];
-  const y=v=>mT+ih*(1-v/100);
-  [0,25,50,75,100].forEach(g=>{
-    svg.appendChild(el("line",{x1:mL,x2:W-mR,y1:y(g),y2:y(g),stroke:css("--line"),"stroke-width":1}));
-    svg.appendChild(txt(mL-8,y(g)+4,g+"%",{fill:css("--faint"),"font-size":10.5,"text-anchor":"end"}));
-  });
-  const gw=iw/groups.length;
-  groups.forEach((g,gi)=>{
-    const gx=mL+gw*gi, bw=gw*0.2, pad=gw*0.1;
-    D.persist.forEach((d,hi)=>{
-      const v=d[g.k]; const bx=gx+pad+bw*hi+ (gw*0.06)*hi;
-      svg.appendChild(el("rect",{x:bx,y:y(v),width:bw,height:mT+ih-y(v),rx:2.5,
-        fill:g.col,opacity:0.45+0.27*hi}));
-      svg.appendChild(txt(bx+bw/2,y(v)-5,Math.round(v),{fill:g.col,"font-size":10.5,
-        "font-weight":700,"text-anchor":"middle"}));
+  const W=720, top=16, rowH=46, gap=30, R=W-124, L=54, TW=R-L;
+  const H=top+D.persist.length*(rowH+gap);
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const hlab=["אחרי שנה","אחרי שנתיים","אחרי 3 שנים"];
+  D.persist.forEach((d,i)=>{
+    const y=top+i*(rowH+gap);
+    svg.appendChild(txt(W-12,y+rowH/2+5,hlab[i],{fill:css("--ink"),"font-size":13.5,
+      "font-weight":700,"text-anchor":"start"}));       // rtl: right-aligned
+    let xr=R;                                            // stack from the right (best) leftward
+    segs.forEach(s=>{
+      const v=s.v(d); if(v<=0) return;
+      const w=v/100*TW, xl=xr-w;
+      svg.appendChild(el("rect",{x:xl,y:y,width:w,height:rowH,fill:s.col,
+        opacity:0.96,stroke:css("--raised"),"stroke-width":1}));
+      if(w>24) svg.appendChild(txt((xl+xr)/2,y+rowH/2+5,Math.round(v)+"%",
+        {fill:"#fff","font-size":13,"font-weight":800,"text-anchor":"middle",style:"direction:ltr"}));
+      xr=xl;
     });
-    svg.appendChild(txt(gx+gw/2,H-mB+18,g.lab,{fill:css("--ink"),"font-size":12,
-      "font-weight":600,"text-anchor":"middle"}));
   });
-  // horizon legend
-  const lx=mL+4; ["+1 שנה","+2 שנים","+3 שנים"].forEach((t,i)=>{
-    const cx=lx+i*92;
-    svg.appendChild(el("rect",{x:cx,y:H-14,width:11,height:11,rx:2,fill:css("--muted"),opacity:0.45+0.27*i}));
-    svg.appendChild(txt(cx+16,H-4,t,{fill:css("--muted"),"font-size":11,"text-anchor":"start"}));
-  });
+  // HTML legend (avoids the old cramped in-chart legend)
+  const lg=document.getElementById("keepLegend");
+  lg.innerHTML=segs.map(s=>
+    `<span><i class="dot" style="background:${s.col}"></i> ${s.lab}</span>`).join("");
 })();
 
 /* ---- Q2: percentile line (mean + median) ---- */
@@ -592,8 +604,8 @@ document.getElementById("volInline").textContent=Math.round(D.pooled_vol);
     const dir=c.ret>=0?"up":"down";
     const top=c.rank<=Math.ceil(c.n/4), low=c.rank>c.n/2;
     let b= top?'<span class="badge top">צמרת</span>': low?'<span class="badge low">תחתית</span>':'';
-    return `<span class="pill ${dir}">${c.ret>=0?'+':''}${c.ret.toFixed(1)}%</span>`
-      +` <span class="rk num">${c.rank}/${c.n}</span> ${b}`;
+    return `<div class="cell"><span class="pill ${dir}">${c.ret>=0?'+':''}${c.ret.toFixed(1)}%</span>`
+      +`<span class="rk num">${c.rank}/${c.n}</span>${b}</div>`;
   }
   let lastFam=null;
   D.cats.forEach((cat,idx)=>{
@@ -606,11 +618,13 @@ document.getElementById("volInline").textContent=Math.round(D.pooled_vol);
     const track=cat.label.split(" · ").slice(1).join(" · ");
     let rows=cat.rows.map(r=>`<tr><td class="y num">${r.y}</td>
       <td class="name">${r.name}</td>
-      <td class="num" style="font-weight:700">+${r.sret.toFixed(1)}%</td>
+      <td class="num" style="font-weight:700;color:var(--gold)">+${r.sret.toFixed(1)}%</td>
       <td>${cell(r.k1)}</td><td>${cell(r.k2)}</td><td>${cell(r.k3)}</td></tr>`).join("");
     det.innerHTML=`<summary><span>${track||cat.label}</span>
       <span class="chev">▸</span></summary>
       <div class="tbl-scroll"><table>
+      <colgroup><col class="c-year"><col class="c-name"><col class="c-sig">
+      <col class="c-follow"><col class="c-follow"><col class="c-follow"></colgroup>
       <thead><tr><th>שנת איתות</th><th>הקופה שנבחרה</th><th>תשואת האיתות</th>
       <th>שנה +1</th><th>שנה +2</th><th>שנה +3</th></tr></thead>
       <tbody>${rows}</tbody></table></div>`;
