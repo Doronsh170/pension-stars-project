@@ -316,7 +316,8 @@ tr.closed td{color:var(--faint);font-style:italic}
       נק' בקופת גמל כללי), והפערים
       הגדולים מופיעים במסלולי המניות (בקרן השתלמות מניות אקטיבי עד כ־<span class="num">__EQMAX__</span> נק').</p>
     <div class="figure">
-      <div class="cap">פער התשואה השנתית (CAGR) בין "רודף" ל"נשאר", בנקודות אחוז, לפי קטגוריה.</div>
+      <div class="cap">פער התשואה השנתית (CAGR) בין "רודף" ל"נשאר", לפי קטגוריה. עמודה
+        זהובה (שמאלה) = יתרון לרודף; עמודה חמרה (ימינה) = יתרון לנשאר. בנקודות אחוז.</div>
       <svg id="chartGap" viewBox="0 0 720 430" role="img"
         aria-label="פער התשואה בין רדיפה להישארות לפי קטגוריה"></svg>
     </div>
@@ -500,61 +501,84 @@ function txt(x,y,s,o={}){const t=el("text",{x,y,...o});t.textContent=s;return t;
   });
 })();
 
-/* ---- gap chart (natural RTL: labels on right, bars grow left) ---- */
+/* Build a family-grouped row layout: a bold header per family, then its
+   track rows (labelled by track only). Returns {rows, H}. */
+function grouped(items,opt){
+  const mT=opt.mT, hH=opt.hH, rowH=opt.rowH, gapH=opt.gapH;
+  let y=mT, out=[], lastFam=null;
+  items.forEach(d=>{
+    if(d.fam!==lastFam){ if(lastFam!==null) y+=gapH; out.push({header:d.fam,y}); y+=hH; lastFam=d.fam; }
+    out.push({d,y}); y+=rowH;
+  });
+  return {rows:out, H:y+opt.mB};
+}
+const trackOf=d=>d.label.split(" · ").slice(1).join(" · ");
+
+/* ---- gap chart: diverging bars, grouped by family, track labels on right ---- */
 (function(){
   const svg=document.getElementById("chartGap");
-  const W=720,H=430,mT=14,mB=30,rowH=(H-mT-mB)/D.strat.length;
-  const maxGap=Math.max(...D.strat.map(d=>d.gap));
-  const xLab=W-10;                       // labels anchored at far right
-  const x0=250;                          // baseline (0), right side of bars
-  const iw=x0-55;                        // positive bars grow leftward
-  const scale=iw/(maxGap*1.08);
-  D.strat.forEach((d,i)=>{
-    const cy=mT+rowH*i, bh=Math.min(24,rowH*0.54), by=cy+(rowH-bh)/2;
-    const isGen=d.label.endsWith("כללי");
-    const neg=d.gap<0;
-    const col=neg?css("--clay"):(isGen?css("--base"):(d.dom==="pension"?css("--clay"):css("--gold")));
-    const span=Math.abs(d.gap)*scale;
-    svg.appendChild(txt(xLab,by+bh/2+5,d.label,{fill:css("--ink"),"font-size":13,
-      "font-weight":isGen?500:600,"text-anchor":"start"}));  // rtl: right edge at xLab
-    const bx=neg?x0:x0-span;
-    svg.appendChild(el("rect",{x:bx,y:by,width:Math.max(1,span),height:bh,rx:4,fill:col,
-      opacity:isGen&&!neg?0.6:0.92}));
+  const items=D.strat;
+  const W=720, opt={mT:12,mB:40,hH:30,rowH:30,gapH:12};
+  const {rows,H}=grouped(items,opt);
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const maxGap=Math.max(...items.map(d=>d.gap)), minGap=Math.min(...items.map(d=>d.gap));
+  const xLab=W-12;                 // track labels: right edge (rtl -> flows left)
+  const x0=362;                    // zero baseline
+  const scale=Math.min((x0-72)/(maxGap*1.1), 150/(Math.abs(minGap)*1.15));
+  svg.appendChild(el("line",{x1:x0,x2:x0,y1:opt.mT,y2:H-opt.mB,stroke:css("--ink"),"stroke-width":1.5}));
+  rows.forEach(it=>{
+    if("header" in it){
+      svg.appendChild(txt(xLab,it.y+21,it.header,{fill:css("--ink"),"font-size":15.5,
+        "font-weight":800,"text-anchor":"start"}));
+      svg.appendChild(el("line",{x1:60,x2:xLab,y1:it.y+28,y2:it.y+28,stroke:css("--line"),"stroke-width":1}));
+      return;
+    }
+    const d=it.d, bh=20, by=it.y+(opt.rowH-bh)/2, isGen=d.label.endsWith("כללי"), neg=d.gap<0;
+    const col=neg?css("--clay"):css("--gold"), span=Math.abs(d.gap)*scale;
+    svg.appendChild(txt(xLab,by+bh/2+5,trackOf(d),{fill:css("--ink"),"font-size":14,
+      "font-weight":isGen?800:600,"text-anchor":"start"}));
+    svg.appendChild(el("rect",{x:neg?x0:x0-span,y:by,width:Math.max(1.5,span),height:bh,rx:4,fill:col,opacity:.95}));
     const lx=neg?x0+span+7:x0-span-7;
     svg.appendChild(txt(lx,by+bh/2+5,(d.gap>=0?"+":"−")+Math.abs(d.gap).toFixed(2),
-      {fill:col,"font-size":13,"font-weight":800,"text-anchor":neg?"start":"end",
-       style:"direction:ltr"}));
+      {fill:col,"font-size":13.5,"font-weight":800,"text-anchor":neg?"start":"end",style:"direction:ltr"}));
   });
-  svg.appendChild(el("line",{x1:x0,x2:x0,y1:mT,y2:H-mB,stroke:css("--ink"),"stroke-width":1.5}));
-  svg.appendChild(txt(x0,H-mB+18,"0",{fill:css("--muted"),"font-size":12,"text-anchor":"middle","font-weight":700}));
-  svg.appendChild(txt(x0-iw,H-mB+18,"פער שנתי (נק' אחוז)",{fill:css("--faint"),
-    "font-size":11.5,"text-anchor":"start",style:"direction:rtl"}));
+  svg.appendChild(txt(x0,H-opt.mB+22,"0",{fill:css("--muted"),"font-size":12,"text-anchor":"middle","font-weight":700}));
+  svg.appendChild(txt(120,H-opt.mB+22,"◄ יתרון לרודף",{fill:css("--faint"),"font-size":12,"text-anchor":"middle"}));
+  svg.appendChild(txt(x0+95,H-opt.mB+22,"יתרון לנשאר ►",{fill:css("--faint"),"font-size":12,"text-anchor":"middle"}));
 })();
 
-/* ---- risk chart (lollipop around 50) ---- */
+/* ---- risk chart: lollipop around 50, grouped by family ---- */
 (function(){
   const svg=document.getElementById("chartRisk");
   const items=D.strat.filter(d=>d.vol!=null);
-  const W=720,H=400,mT=12,mB=34,rowH=(H-mT-mB)/items.length;
-  const xL=250,xR=W-40, base=50, mn=40,mx=100;
+  const W=720, opt={mT:14,mB:38,hH:30,rowH:30,gapH:12};
+  const {rows,H}=grouped(items,opt);
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const xLab=W-12, xL=56, xR=W-196, base=50, mn=40, mx=100;
   const x=v=>xL+(xR-xL)*(v-mn)/(mx-mn);
-  // grid
   [40,50,60,70,80,90,100].forEach(g=>{
-    svg.appendChild(el("line",{x1:x(g),x2:x(g),y1:mT,y2:H-mB,
+    svg.appendChild(el("line",{x1:x(g),x2:x(g),y1:opt.mT,y2:H-opt.mB,
       stroke:g===base?css("--base"):css("--line"),"stroke-width":g===base?1.5:1,
       "stroke-dasharray":g===base?"5 4":""}));
-    svg.appendChild(txt(x(g),H-mB+18,g,{fill:g===base?css("--muted"):css("--faint"),
+    svg.appendChild(txt(x(g),H-opt.mB+18,g,{fill:g===base?css("--muted"):css("--faint"),
       "font-size":11,"text-anchor":"middle","font-weight":g===base?700:400}));
   });
-  svg.appendChild(txt(x(base),mT-1,"אמצע",{fill:css("--muted"),"font-size":10.5,"text-anchor":"middle"}));
-  items.forEach((d,i)=>{
-    const cy=mT+rowH*(i+0.5);
-    const col=d.dom==="pension"?css("--clay"):(d.label.includes("כללי")?css("--teal"):css("--gold"));
-    svg.appendChild(txt(xL-12,cy+4,d.label,{fill:css("--ink"),"font-size":13,"text-anchor":"end"}));
+  svg.appendChild(txt(x(base),opt.mT-2,"אמצע הקטגוריה",{fill:css("--muted"),"font-size":10.5,"text-anchor":"middle"}));
+  rows.forEach(it=>{
+    if("header" in it){
+      svg.appendChild(txt(xLab,it.y+21,it.header,{fill:css("--ink"),"font-size":15.5,
+        "font-weight":800,"text-anchor":"start"}));
+      return;
+    }
+    const d=it.d, cy=it.y+opt.rowH/2, isGen=d.label.endsWith("כללי");
+    const col=isGen?css("--teal"):css("--gold");
+    svg.appendChild(txt(xLab,cy+5,trackOf(d),{fill:css("--ink"),"font-size":14,
+      "font-weight":isGen?800:600,"text-anchor":"start"}));
     svg.appendChild(el("line",{x1:x(base),x2:x(d.vol),y1:cy,y2:cy,stroke:col,"stroke-width":2.5,opacity:.5}));
     svg.appendChild(el("circle",{cx:x(d.vol),cy:cy,r:6,fill:col}));
-    svg.appendChild(txt(x(d.vol)+ (d.vol>92?-14:12),cy+4,Math.round(d.vol),{fill:col,"font-size":12.5,
-      "font-weight":800,"text-anchor":d.vol>92?"end":"start"}));
+    const right=d.vol>=base;
+    svg.appendChild(txt(x(d.vol)+(right?12:-12),cy+4,Math.round(d.vol),{fill:col,"font-size":12.5,
+      "font-weight":800,"text-anchor":right?"start":"end",style:"direction:ltr"}));
   });
 })();
 document.getElementById("volInline").textContent=Math.round(D.pooled_vol);
@@ -643,13 +667,19 @@ def _split_chart(rows):
 #      it ranked one, two and three years later. Straight from events.csv, so the
 #      names and places stay exact. A deliberately varied set of broad, well-known
 #      funds: some kept winning, some slid to mid-pack, some collapsed. ----
+# A deliberately varied set of large, well-known funds, each finishing #1 in
+# its category in a given year — some kept winning, some collapsed, some closed.
 EXAMPLES = [
-    ('gemel', 'קרנות השתלמות | כללי', "2019"),                 # מור — stayed near the top (1→2)
-    ('gemel', 'תגמולים ואישית לפיצויים | כללי', "2010"),        # כלל איתן — #1, then dead last, then back to #1
-    ('gemel', 'תגמולים ואישית לפיצויים | מניות אקטיבי', "2019"), # אלפא מור — huge year, then slid to mid-pack
-    ('gemel', 'תגמולים ואישית לפיצויים | מניות אקטיבי', "2012"), # תמיר פישמן — won, then closed
-    ('gemel', 'קרנות השתלמות | מניות אקטיבי', "2010"),          # אנליסט — led, then slid to mid-pack
-    ('gemel', 'קרנות השתלמות | כללי', "2023"),                 # אינפיניטי — recent, held near the top
+    ('gemel', 'קרנות השתלמות | כללי', "2019"),                     # מור — #1, held near the top (1→5→2)
+    ('gemel', 'תגמולים ואישית לפיצויים | כללי', "2010"),            # כלל איתן — #1, then dead last, then back to #1
+    ('gemel', 'קרנות השתלמות | מניות אקטיבי', "2019"),             # מור מניות — +50% year, then slid to mid-pack
+    ('gemel', 'קרנות השתלמות | מניות אקטיבי', "2017"),             # אלטשולר שחם — dropped, then bounced back
+    ('gemel', 'תגמולים ואישית לפיצויים | כללי', "2019"),           # אלפא מור — #1, then faded
+    ('gemel', 'קרנות השתלמות | כללי', "2021"),                     # אנליסט — climbed the following years to #1
+    ('gemel', 'תגמולים ואישית לפיצויים | כללי', "2017"),           # אלטשולר שחם גמל — near-bottom, then recovered
+    ('gemel', 'קרנות השתלמות | אג"ח ללא מניות', "2012"),           # הפניקס — a bond track that did persist (1→1→5)
+    ('gemel', 'תגמולים ואישית לפיצויים | אג"ח עד 25% מניות', "2017"), # כלל תמר — top, then faded
+    ('gemel', 'תגמולים ואישית לפיצויים | אג"ח עד 25% מניות', "2021"), # הראל — #1, then dropped and closed
 ]
 _evx = {(e["domain"], e["category"], e["signal_year"]): e for e in events}
 def _rank_cls(rank, n):
@@ -843,9 +873,9 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
 
   <div class="example">
     <div class="sec-eyebrow teal">דוגמאות מוחשיות: קופה אחת לאורך זמן</div>
-    <p class="ex-intro">כל דוגמה עוקבת אחרי קופה אחת שסיימה במקום הראשון בקטגוריה שלה בשנה
-      מסוימת, ומראה היכן דורגה שנה, שנתיים ושלוש שנים לאחר מכן. לעיתים שמרה על מקומה,
-      לעיתים צנחה.</p>
+    <p class="ex-intro">כל דוגמה עוקבת אחרי קופה <b>גדולה ומוכרת</b> שסיימה במקום הראשון
+      בקטגוריה שלה בשנה מסוימת, ומראה היכן דורגה שנה, שנתיים ושלוש שנים לאחר מכן. לעיתים
+      שמרה על מקומה, לעיתים צנחה, ולעיתים אף נסגרה.</p>
     <div class="ex-grid">__EX_CARDS__</div>
     <p class="ex-note">להמחשה בלבד. המעקב המלא, בכל הקטגוריות ובכל השנים, נמצא במחקר המלא.</p>
   </div>
