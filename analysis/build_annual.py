@@ -22,10 +22,15 @@ ROOT = os.path.dirname(HERE)
 # Single consolidated provident-fund table (gemel + study funds), 2010-2025,
 # supplied as one sheet. The study is provident-only; pension funds are not in
 # this source. The pipeline still applies the public-access / IRA / sick-pay
-# filters below, so the exact fund pool is unchanged from the earlier run.
+# filters below. The investment track for each fund comes from the curated
+# `מסלול ממופה` (mapped-route) column, which folds the regulator's many raw
+# SPECIALIZATION labels into a clean, stable set of tracks.
 SOURCES = [
-    ("gemel-merged-2010-2025.xlsx", "‏‏צרף1", "gemel"),
+    ("gemel-mapped-2010-2025.xlsx", "ראשי", "gemel"),
 ]
+
+# Column holding the curated investment track (see analysis/map_other_bucket.py).
+MAPPED_ROUTE_COL = "מסלול ממופה"
 
 
 def norm(s):
@@ -35,7 +40,7 @@ def norm(s):
 
 
 def load_rows():
-    """Yield (domain, fund_id, fund_name, classification, specialization, year, month, monthly_yield)."""
+    """Yield (domain, fund_id, fund_name, classification, mapped_route, year, month, monthly_yield)."""
     for fname, sheet, domain in SOURCES:
         path = os.path.join(ROOT, fname)
         wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
@@ -46,17 +51,22 @@ def load_rows():
         c_id = idx["FUND_ID"]
         c_name = idx["FUND_NAME"]
         c_cls = idx["FUND_CLASSIFICATION"]
-        c_spec = idx.get("SPECIALIZATION")  # pension has no specialization
+        c_route = idx[MAPPED_ROUTE_COL]      # curated investment track
         c_tp = idx.get("TARGET_POPULATION")  # gemel only; marks who may join
-        c_per = idx["REPORT_PERIOD"]
+        c_per = idx.get("REPORT_PERIOD") or idx["תקופת דיווח"]
         c_my = idx["MONTHLY_YIELD"]
         for r in it:
             per = r[c_per]
             if per is None:
                 continue
-            per = str(per)
-            if len(per) < 6:
-                continue
+            # REPORT_PERIOD may be a datetime (new file) or a YYYYMM string (old).
+            if hasattr(per, "year"):
+                per_year, per_month = per.year, per.month
+            else:
+                per = str(per)
+                if len(per) < 6:
+                    continue
+                per_year, per_month = int(per[:4]), int(per[4:6])
             # Keep only broad funds that are open to the general public. Sectoral
             # funds ("עובדי סקטור מסויים", e.g. a profession) and employer funds
             # ("עובדי מפעל/גוף מסויים", e.g. a single company) are excluded: a
@@ -79,22 +89,24 @@ def load_rows():
             # product a saver would ever choose, so they don't belong in the pool.
             if name and "דמי מחלה" in name:
                 continue
-            year = int(per[:4]); month = int(per[4:6])
-            spec = norm(r[c_spec]) if c_spec is not None else None
-            yield (domain, r[c_id], name, norm(r[c_cls]), spec,
-                   year, month, r[c_my])
+            route = norm(r[c_route])
+            # Skip rows without a resolved track (should be none after mapping).
+            if not route or route == "אחר, לבדיקה":
+                continue
+            yield (domain, r[c_id], name, norm(r[c_cls]), route,
+                   per_year, per_month, r[c_my])
         wb.close()
 
 
 def main():
     # (domain, fund_id, year) -> dict
-    acc = defaultdict(lambda: {"months": {}, "name": None, "cls": None, "spec": None})
-    for domain, fid, name, cls, spec, year, month, my in load_rows():
+    acc = defaultdict(lambda: {"months": {}, "name": None, "cls": None, "route": None})
+    for domain, fid, name, cls, route, year, month, my in load_rows():
         key = (domain, fid, year)
         d = acc[key]
         d["name"] = name
         d["cls"] = cls
-        d["spec"] = spec
+        d["route"] = route
         if my is not None:
             d["months"][month] = float(my)
 
@@ -102,7 +114,7 @@ def main():
     with open(out_path, "w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
         w.writerow(["domain", "fund_id", "fund_name", "classification",
-                    "specialization", "category", "year", "annual_return", "n_months"])
+                    "mapped_route", "category", "year", "annual_return", "n_months"])
         for (domain, fid, year), d in sorted(acc.items(), key=lambda x: (x[0][0], x[0][2], x[0][1])):
             months = d["months"]
             n = len(months)
@@ -113,12 +125,9 @@ def main():
                 if m in months:
                     comp *= (1 + months[m] / 100.0)
             annual = (comp - 1) * 100.0
-            # category: pension -> classification; gemel -> classification | specialization
-            if domain == "pension":
-                category = d["cls"]
-            else:
-                category = d["cls"] if not d["spec"] else f'{d["cls"]} | {d["spec"]}'
-            w.writerow([domain, fid, d["name"], d["cls"], d["spec"], category,
+            # category = classification | mapped investment track
+            category = f'{d["cls"]} | {d["route"]}'
+            w.writerow([domain, fid, d["name"], d["cls"], d["route"], category,
                         year, round(annual, 4), n])
     print("wrote", out_path)
 

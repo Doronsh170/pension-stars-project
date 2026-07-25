@@ -31,20 +31,30 @@ HORIZONS = (1, 2, 3)
 FIRST_YEAR = 2010           # study focuses on signal years from 2010 onward
 LAST_COMPLETE_YEAR = 2025   # 2026 is only a partial year in the raw data
 
-# Categories we study, grouped into the two provident-fund families that a saver
-# actually chooses between. Provident (קופת גמל) and study (קרן השתלמות) are
-# kept strictly separate. Within each we compare like-with-like tracks.
+# The two provident-fund families a saver actually chooses between. Provident
+# (קופת גמל) and study (קרן השתלמות) are kept strictly separate; within each we
+# compare like-with-like investment tracks (the curated `מסלול ממופה`).
+FAMILIES = ['קרנות השתלמות', 'תגמולים ואישית לפיצויים']
+
+# Track display order (only tracks with >=MIN_FUNDS funds in >=3 signal years
+# survive the filter below; thin tracks are dropped automatically).
+TRACK_ORDER = [
+    'כללי',
+    'מניות אקטיבי',
+    'מניות פאסיבי',
+    'S&P 500',
+    'אג"ח עד 25% מניות',
+    'אג"ח ללא מניות',
+    'אג"ח ממשלתי',
+    'כספי',
+    'מעורב / גמיש',
+    'הלכתי',
+    'מבטיח תשואה',
+]
+
+# category string = "<family> | <track>", matching build_annual.py.
 CATEGORIES = {
-    "gemel": [
-        # קרן השתלמות
-        'קרנות השתלמות | כללי',
-        'קרנות השתלמות | מניות',
-        'קרנות השתלמות | אג"ח',
-        # קופת גמל (תגמולים ואישית לפיצויים)
-        'תגמולים ואישית לפיצויים | כללי',
-        'תגמולים ואישית לפיצויים | מניות',
-        'תגמולים ואישית לפיצויים | אג"ח',
-    ],
+    "gemel": [f"{fam} | {track}" for fam in FAMILIES for track in TRACK_ORDER],
 }
 
 

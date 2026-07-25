@@ -22,12 +22,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 def read(n): return list(csv.DictReader(open(os.path.join(HERE, n), encoding="utf-8-sig")))
 events = read("events.csv"); strat = read("strategy_summary.csv"); risk = read("risk_summary.csv")
 
+from chase_analysis import FAMILIES, TRACK_ORDER
+_present = {(e["domain"], e["category"]) for e in events}
 CAT_ORDER = [
-    ("gemel", 'קרנות השתלמות | כללי'), ("gemel", 'קרנות השתלמות | מניות'),
-    ("gemel", 'קרנות השתלמות | אג"ח'),
-    ("gemel", 'תגמולים ואישית לפיצויים | כללי'),
-    ("gemel", 'תגמולים ואישית לפיצויים | מניות'),
-    ("gemel", 'תגמולים ואישית לפיצויים | אג"ח'),
+    ("gemel", f"{fam} | {track}")
+    for fam in FAMILIES for track in TRACK_ORDER
+    if ("gemel", f"{fam} | {track}") in _present
 ]
 def family(c):
     if c.startswith("קרנות השתלמות"): return "קרן השתלמות"
@@ -102,6 +102,7 @@ def _gap(cat):
     s = strat_by.get(("gemel", cat)) or strat_by.get(("pension", cat))
     return f'{float(s["gap_annualized_pp"]):+.2f}'.replace("-", "−") if s else "—"
 SG = _gap('קרנות השתלמות | כללי'); PG = _gap('תגמולים ואישית לפיצויים | כללי')
+EQMAX = _gap('קרנות השתלמות | מניות אקטיבי')   # largest equity-track gap
 
 HTML = r"""<!doctype html>
 <html lang="he" dir="rtl">
@@ -252,7 +253,7 @@ tr.closed td{color:var(--faint);font-style:italic}
   <div class="sourceline">
     <span><b>מקור:</b> גמל-נט (רשות שוק ההון)</span>
     <span><b>תקופה:</b> שנות איתות <span class="num">2010–2024</span> · מעקב עד <span class="num">2025</span></span>
-    <span><b>היקף:</b> <span class="num">6</span> קטגוריות · <span class="num" id="evCount">70</span> אירועי איתות</span>
+    <span><b>היקף:</b> <span class="num" id="catCount">13</span> קטגוריות · <span class="num" id="evCount">70</span> אירועי איתות</span>
   </div>
 </div></div>
 
@@ -313,7 +314,7 @@ tr.closed td{color:var(--faint);font-style:italic}
       כספם של החוסכים, לא נמצא יתרון לרודף, ובנקודת האומדן הפער אף שלילי
       (כ־<span class="num">__SG__</span> נק' בקרן השתלמות כללי, כ־<span class="num">__PG__</span>
       נק' בקופת גמל כללי), והפערים
-      הגדולים מופיעים במסלולי המניות (בקרן השתלמות מניות עד כ־<span class="num">+3.25</span> נק').</p>
+      הגדולים מופיעים במסלולי המניות (בקרן השתלמות מניות אקטיבי עד כ־<span class="num">__EQMAX__</span> נק').</p>
     <div class="figure">
       <div class="cap">פער התשואה השנתית (CAGR) בין "רודף" ל"נשאר", בנקודות אחוז, לפי קטגוריה.</div>
       <svg id="chartGap" viewBox="0 0 720 430" role="img"
@@ -360,8 +361,9 @@ tr.closed td{color:var(--faint);font-style:italic}
     <h2>תמצית הממצאים</h2>
     <p class="body">הנתונים ההיסטוריים מצביעים על התמונה הבאה, המוצגת כעובדות:</p>
     <ol>
-      <li><b>שמירת מעמד חלקית וזמנית.</b> רק כ־10% מהמובילות חזרו למקום הראשון בשנה
-        שאחרי, כ־49% ירדו למחצית התחתונה, ובתוך שלוש שנים כ־40% מהן נסגרו או מוזגו.</li>
+      <li><b>שמירת מעמד חלקית וזמנית.</b> רק כ־<span id="c_no1">10%</span> מהמובילות חזרו
+        למקום הראשון בשנה שאחרי, כ־<span id="c_bot">49%</span> ירדו למחצית התחתונה, ובתוך
+        שלוש שנים כ־<span id="c_van3">40%</span> מהן נסגרו או מוזגו.</li>
       <li><b>הדירוג האופייני הוא "טוב מהממוצע", לא "מוביל".</b> מובילת אשתקד מדורגת
         בשנה שאחרי סביב השליש העליון, והאחוזון הממוצע מתכנס אל עבר האמצע עם הזמן.</li>
       <li><b>היתרון הכספי אינו אחיד וקשור לסיכון.</b> במסלולים הכלליים לא נמצא יתרון,
@@ -401,6 +403,11 @@ function txt(x,y,s,o={}){const t=el("text",{x,y,...o});t.textContent=s;return t;
 (function(){
   const p1=D.persist[0];
   document.getElementById("evCount").textContent=D.total;
+  document.getElementById("catCount").textContent=D.strat.length;
+  const _set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  _set("c_no1",Math.round(p1.no1)+"%");
+  _set("c_bot",Math.round(p1.bot)+"%");
+  _set("c_van3",Math.round(D.persist[2].vanished)+"%");
   document.getElementById("s_no1").textContent=Math.round(p1.no1)+"%";
   document.getElementById("s_top3").textContent=Math.round(p1.top3)+"%";
   document.getElementById("s_bot").textContent=Math.round(p1.bot)+"%";
@@ -592,7 +599,8 @@ document.getElementById("volInline").textContent=Math.round(D.pooled_vol);
 </html>"""
 
 open(os.path.join(HERE, "report.html"), "w", encoding="utf-8").write(
-    HTML.replace("__DATA__", DATA).replace("__SG__", SG).replace("__PG__", PG))
+    HTML.replace("__DATA__", DATA).replace("__SG__", SG).replace("__PG__", PG)
+        .replace("__EQMAX__", EQMAX))
 print("wrote report.html")
 
 # =====================================================================
@@ -636,12 +644,12 @@ def _split_chart(rows):
 #      names and places stay exact. A deliberately varied set of broad, well-known
 #      funds: some kept winning, some slid to mid-pack, some collapsed. ----
 EXAMPLES = [
-    ('gemel', 'קרנות השתלמות | כללי', "2019"),          # מור — kept its place at the top
-    ('gemel', 'תגמולים ואישית לפיצויים | כללי', "2010"),  # כלל איתן — top, then dead last, then back
-    ('gemel', 'קרנות השתלמות | כללי', "2021"),          # אנליסט — dropped, then back to #1
-    ('gemel', 'תגמולים ואישית לפיצויים | מניות', "2015"), # אקסלנס — top, then slid to last
-    ('gemel', 'קרנות השתלמות | מניות', "2012"),         # תמיר פישמן — won, then closed
-    ('gemel', 'קרנות השתלמות | כללי', "2022"),          # מור — settled into mid-pack
+    ('gemel', 'קרנות השתלמות | כללי', "2019"),                 # מור — stayed near the top (1→2)
+    ('gemel', 'תגמולים ואישית לפיצויים | כללי', "2010"),        # כלל איתן — #1, then dead last, then back to #1
+    ('gemel', 'תגמולים ואישית לפיצויים | מניות אקטיבי', "2019"), # אלפא מור — huge year, then slid to mid-pack
+    ('gemel', 'תגמולים ואישית לפיצויים | מניות אקטיבי', "2012"), # תמיר פישמן — won, then closed
+    ('gemel', 'קרנות השתלמות | מניות אקטיבי', "2010"),          # אנליסט — led, then slid to mid-pack
+    ('gemel', 'קרנות השתלמות | כללי', "2023"),                 # אינפיניטי — recent, held near the top
 ]
 _evx = {(e["domain"], e["category"], e["signal_year"]): e for e in events}
 def _rank_cls(rank, n):
@@ -867,7 +875,7 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
   <div class="src">
     <span><b>מקור:</b> גמל-נט (רשות שוק ההון)</span> ·
     <span><b>תקופה:</b> <span class="num">2010–2025</span></span> ·
-    <span><b>היקף:</b> <span class="num">__EVENTS__</span> אירועי איתות, <span class="num">6</span> קטגוריות</span>
+    <span><b>היקף:</b> <span class="num">__EVENTS__</span> אירועי איתות, <span class="num">__NCAT__</span> קטגוריות</span>
   </div>
   <p class="disclaimer">גילוי נאות: התוכן נועד למידע כללי ולמטרות לימודיות בלבד, ואינו
     מהווה ייעוץ או שיווק פנסיוני או השקעות ואינו תחליף לייעוץ אישי המתחשב בנתוניו ובצרכיו
@@ -882,7 +890,8 @@ idx_out = INDEX
 for k, v in {"__NO1__":IDX["no1"], "__BOT__":IDX["bot"], "__RANK__":IDX["rank"],
              "__N__":IDX["n"], "__SG__":IDX["sg"], "__PG__":IDX["pg"],
              "__VAN1__":IDX["van1"], "__VAN3__":IDX["van3"],
-             "__EVENTS__":IDX["events"], "__CHART__":IDX["chart"],
+             "__EVENTS__":IDX["events"], "__NCAT__":str(len(CAT_ORDER)),
+             "__CHART__":IDX["chart"],
              "__EX_CARDS__":IDX["ex_cards"]}.items():
     idx_out = idx_out.replace(k, v)
 open(os.path.join(HERE, os.pardir, "index.html"), "w", encoding="utf-8").write(idx_out)
