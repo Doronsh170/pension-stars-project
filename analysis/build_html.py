@@ -228,12 +228,16 @@ summary::-webkit-details-marker{display:none}
 summary .chev{color:var(--faint);transition:transform .2s;font-size:13px}
 details[open] summary .chev{transform:rotate(90deg)}
 summary:hover{background:var(--line2)}
-.tbl-scroll{overflow-x:auto;border-top:1px solid var(--line)}
-table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px}
-th,td{padding:9px 12px;text-align:start;border-bottom:1px solid var(--line2);white-space:nowrap}
-thead th{font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);
-  font-weight:700;position:sticky;top:0;background:var(--raised)}
-td.name{white-space:normal;min-width:200px;color:var(--muted)}
+.tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border-top:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:0;table-layout:fixed}
+th,td{padding:8px 8px;text-align:start;border-bottom:1px solid var(--line2);vertical-align:top}
+thead th{font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:var(--faint);
+  font-weight:700;position:sticky;top:0;background:var(--raised);white-space:nowrap}
+td.name{white-space:normal;color:var(--muted);line-height:1.35;word-break:break-word}
+/* compact, fixed column widths so all six columns fit without clipping */
+col.c-year{width:8%} col.c-name{width:30%} col.c-sig{width:12%}
+col.c-follow{width:16.66%}
+td .cell{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}
 td.y{font-weight:700;color:var(--gold)}
 .pill{display:inline-flex;gap:5px;align-items:center;font-variant-numeric:tabular-nums;direction:ltr}
 .rk{font-size:11px;color:var(--faint)}
@@ -335,33 +339,31 @@ tr.closed td{color:var(--faint);font-style:italic}
       <svg id="chartGap" viewBox="0 0 720 430" role="img"
         aria-label="פער התשואה בין רדיפה להישארות לפי קטגוריה"></svg>
     </div>
-    <p class="body"><b>(ב) הקשר לסיכון.</b> המובילה יושבת בממוצע באחוזון תנודתיות
-      <span class="emteal" id="volInline">67</span> בתוך הקטגוריה, והיא נוטה להיות מהקופות
-      המסוכנות יותר בקבוצתה (במסלולי המניות: לא פעם מסלולי מדד או עוקבי
-      <span class="num">S&P 500</span>). מאחר שהתקופה כללה בעיקר שנים של עליות, קופות
-      בעלות חשיפה מנייתית גבוהה השיגו בממוצע תשואות גבוהות יותר, כך שהפער הכספי שבסעיף
-      (א) קשור במידה רבה לרמת הסיכון, ולא בהכרח להתמדה של ביצועים.</p>
+    <p class="body"><b>(ב) הקשר לסיכון.</b> <b>איך מדדנו סיכון?</b> לכל קופה יש
+      <b>סטיית תקן</b> — מדד לתנודתיות: כמה התשואה שלה "קופצת" מעלה ומטה. לכל קופה מובילה
+      בדקנו היכן היא ממוקמת בתוך הקטגוריה שלה במונחי תנודתיות, בסולם אחוזון:
+      <span class="num">50</span> = תנודתיות ממוצעת לקטגוריה, <span class="num">100</span> =
+      הקופה התנודתית (המסוכנת) ביותר בקבוצה. המובילה יושבת בממוצע באחוזון
+      <span class="emteal" id="volInline">67</span> — כלומר נוטה להיות מהתנודתיות יותר
+      בקבוצתה (במסלולי המניות: לא פעם עוקבי <span class="num">S&P 500</span>). מאחר
+      שהתקופה כללה בעיקר שנים של עליות, קופות מסוכנות יותר השיגו בממוצע תשואות גבוהות
+      יותר — כך שהפער הכספי שבסעיף (א) קשור במידה רבה לרמת הסיכון, ולא בהכרח להתמדה של ביצועים.</p>
     <div class="figure">
-      <div class="cap">אחוזון התנודתיות של המובילה בתוך הקטגוריה (50 = ללא הטיה, 100 = המסוכנת ביותר).</div>
+      <div class="cap">אחוזון התנודתיות (סטיית התקן) של המובילה בתוך הקטגוריה
+        (50 = תנודתיות ממוצעת, 100 = המסוכנת ביותר בקבוצה).</div>
       <svg id="chartRisk" viewBox="0 0 720 400" role="img"
         aria-label="אחוזון התנודתיות של המובילות לפי קטגוריה"></svg>
     </div>
   </section>
 
   <section>
-    <div class="eyebrow">אמינות · בדיקת מובהקות</div>
-    <h2>עד כמה הממצאים מוצקים?</h2>
-    <p class="body">לא הסתפקנו בממוצעים, אלא בדקנו כמה מהם עמידים סטטיסטית (מבחני
-      bootstrap; המספרים המלאים ורווחי הסמך בקובץ <code>robustness.py</code>).</p>
-    <p class="body"><b>ההתמדה קטנה ולא יציבה.</b> היתרון של מובילת אשתקד על פני ממוצע
-      הקטגוריה קטן, ולרוב אינו חורג בבירור מגבול המקריות; הוא אינו עקבי לאורך זמן ונעלם
-      בתוך שלוש שנים.</p>
-    <p class="body"><b>והוא תלוי בקופות ששרדו.</b> כאשר מכניסים לחשבון גם את הקופות
-      שנסגרו או מוזגו, היתרון נעלם. כלומר הוא מופיע רק אם מתעלמים מהן.</p>
-    <p class="body"><b>במסלולים הכלליים אין הבדל של ממש.</b> הפער הכספי בין "רודף"
-      ל"נשאר" במסלולים הכלליים (קרן השתלמות כללי, קופת גמל כללי) אינו שונה סטטיסטית
-      מאפס. הפער המובהק היחיד הוא במסלול המניות של קרן ההשתלמות, שהוא גם מהמסוכנים יותר,
-      כך שהוא עולה בקנה אחד עם פרמיית סיכון בתקופת שווקים עולים.</p>
+    <div class="eyebrow">אמינות</div>
+    <h2>עד כמה הממצא מוצק?</h2>
+    <p class="body">בדקנו אם התוצאות אמיתיות או סתם "מזל" אקראי. בקצרה:
+      <b>היתרון של מובילת אשתקד קטן, לא יציב, ונעלם בתוך שלוש שנים</b> — ובמסלולים
+      הכלליים, שבהם מרוכז רוב הכסף, כמעט שאין הבדל בין "רודף" ל"נשאר". חשוב מכך:
+      היתרון מופיע רק כשמתעלמים מהקופות שנסגרו בדרך; מרגע שמכניסים גם אותן לחשבון,
+      הוא נעלם.</p>
   </section>
 
   <section>
@@ -602,8 +604,8 @@ document.getElementById("volInline").textContent=Math.round(D.pooled_vol);
     const dir=c.ret>=0?"up":"down";
     const top=c.rank<=Math.ceil(c.n/4), low=c.rank>c.n/2;
     let b= top?'<span class="badge top">צמרת</span>': low?'<span class="badge low">תחתית</span>':'';
-    return `<span class="pill ${dir}">${c.ret>=0?'+':''}${c.ret.toFixed(1)}%</span>`
-      +` <span class="rk num">${c.rank}/${c.n}</span> ${b}`;
+    return `<div class="cell"><span class="pill ${dir}">${c.ret>=0?'+':''}${c.ret.toFixed(1)}%</span>`
+      +`<span class="rk num">${c.rank}/${c.n}</span>${b}</div>`;
   }
   let lastFam=null;
   D.cats.forEach((cat,idx)=>{
@@ -616,11 +618,13 @@ document.getElementById("volInline").textContent=Math.round(D.pooled_vol);
     const track=cat.label.split(" · ").slice(1).join(" · ");
     let rows=cat.rows.map(r=>`<tr><td class="y num">${r.y}</td>
       <td class="name">${r.name}</td>
-      <td class="num" style="font-weight:700">+${r.sret.toFixed(1)}%</td>
+      <td class="num" style="font-weight:700;color:var(--gold)">+${r.sret.toFixed(1)}%</td>
       <td>${cell(r.k1)}</td><td>${cell(r.k2)}</td><td>${cell(r.k3)}</td></tr>`).join("");
     det.innerHTML=`<summary><span>${track||cat.label}</span>
       <span class="chev">▸</span></summary>
       <div class="tbl-scroll"><table>
+      <colgroup><col class="c-year"><col class="c-name"><col class="c-sig">
+      <col class="c-follow"><col class="c-follow"><col class="c-follow"></colgroup>
       <thead><tr><th>שנת איתות</th><th>הקופה שנבחרה</th><th>תשואת האיתות</th>
       <th>שנה +1</th><th>שנה +2</th><th>שנה +3</th></tr></thead>
       <tbody>${rows}</tbody></table></div>`;
