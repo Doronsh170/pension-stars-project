@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Shared access to the two source workbooks in the repository root.
+Shared access to the single source workbook in the repository root.
 
-`gemel-2010-2025.xlsx`  — the consolidated gemel-net extract: one row per
+`gemel-2010-2025.xlsx` — the consolidated gemel-net extract: one row per
     fund x reporting month, 2010-2025, already restricted by the regulator's
-    TARGET_POPULATION field to funds open to the general public. It carries
-    the regulator's own SPECIALIZATION / SUB_SPECIALIZATION track labels.
+    TARGET_POPULATION field to funds open to the general public. Besides the
+    regulator's own fields it carries a curated `מסלול ממופה` column: every
+    fund's investment track, folded into one small, stable set of tracks. That
+    column is the study's comparison dimension — it is constant per FUND_ID
+    across the whole history (verified: none of the 1,280 funds changes track).
 
-`fund-risk-map.xlsx`    — the curated mapping table: FUND_NAME ->
-    SPECIALIZATION, SUB_SPECIALIZATION and, most importantly, a single stable
-    `רמת סיכון` (risk level) per fund. This is the column the study groups on.
-
-Both files are read here so every stage sees the same universe and the same
+The file is read here so every stage sees the same universe and the same
 exclusion rules.
 """
 import os
@@ -22,12 +21,23 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
 DATA_XLSX = os.path.join(ROOT, "gemel-2010-2025.xlsx")
-RISKMAP_XLSX = os.path.join(ROOT, "fund-risk-map.xlsx")
 
-# Risk levels, least to most risky. This is the study's comparison dimension:
-# funds are ranked against other funds of the same risk level, not against the
-# whole market, so a "winner" is never just the fund that took more equity.
-RISK_ORDER = ["נמוך מאוד", "נמוך", "נמוך-בינוני", "בינוני", "גבוה"]
+# The mapped tracks, ordered from the most solid to the boldest. Funds are
+# ranked only against other funds on the same track, so a "winner" is never
+# just the fund that took more equity than its rivals.
+TRACK_ORDER = [
+    "כספי/מבטיח תשואה",
+    'אג"ח ללא מניות',
+    "עד 25% מניות",
+    "כללי/מעורב/גמיש/תלוי גיל",
+    "מניות פאסיבי",
+    "מניות אקטיבי",
+]
+
+# `אחר` is the residual bucket of the mapping (a handful of foreign-currency
+# tracks, never more than 7 funds in a family-year). It is not a comparison
+# group a saver chooses inside, so it stays out.
+TRACK_EXCLUDE = {"אחר", ""}
 
 # Fund families a saver actively chooses between. `מרכזית לפיצויים` (an employer
 # severance reserve) and `מטרה אחרת` are excluded: the saver does not pick them.
@@ -46,21 +56,15 @@ FAMILY_LABEL = {
     "קופת גמל להשקעה - חסכון לילד": "חיסכון לכל ילד",
 }
 
-BLANK = "(ריק)"   # how the mapping table spells an empty cell
+BLANK = "(ריק)"   # how the source spells an empty cell
 
 
 def norm(s):
-    """Collapse whitespace; treat the mapping table's `(ריק)` as empty."""
+    """Collapse whitespace; treat the source's `(ריק)` as empty."""
     if s is None:
         return ""
     s = " ".join(str(s).split()).strip()
     return "" if s == BLANK else s
-
-
-def norm_risk(s):
-    """Normalise the risk label (the source has one `נמוך -בינוני` typo)."""
-    s = norm(s)
-    return s.replace("נמוך -בינוני", "נמוך-בינוני")
 
 
 def excluded_fund(name):
@@ -83,7 +87,7 @@ def _data_sheet(wb):
         first = next(ws.iter_rows(max_row=1, values_only=True), None)
         if first and norm(first[0]) == "FUND_ID":
             return ws
-    raise RuntimeError("no data sheet with a FUND_ID header in " + wb.path)
+    raise RuntimeError("no data sheet with a FUND_ID header in " + DATA_XLSX)
 
 
 def iter_data(fields):
@@ -100,7 +104,7 @@ def iter_data(fields):
     want = [(f, idx[f]) for f in fields]
     c_per, c_name = idx["REPORT_PERIOD"], idx["FUND_NAME"]
     for r in it:
-        # REPORT_PERIOD is YYYYMM (string in this extract, datetime if re-saved).
+        # REPORT_PERIOD is YYYYMM (number in this extract, datetime if re-saved).
         per = r[c_per]
         if per is None:
             continue
@@ -122,29 +126,8 @@ def iter_data(fields):
     wb.close()
 
 
-def load_risk_map():
-    """FUND_NAME -> {specialization, sub_specialization, risk} from the map."""
-    wb = openpyxl.load_workbook(RISKMAP_XLSX, read_only=True, data_only=True)
-    ws = wb.worksheets[0]
-    it = ws.iter_rows(values_only=True)
-    header = [norm(h) for h in next(it)]
-    idx = {h: i for i, h in enumerate(header)}
-    out = {}
-    for r in it:
-        name = norm(r[idx["FUND_NAME"]])
-        if not name:
-            continue
-        out[name] = {
-            "specialization": norm(r[idx["SPECIALIZATION"]]),
-            "sub_specialization": norm(r[idx["SUB_SPECIALIZATION"]]),
-            "risk": norm_risk(r[idx["רמת סיכון"]]),
-        }
-    wb.close()
-    return out
-
-
 def num(v):
-    """Float or None — the extract stores every number as text."""
+    """Float or None — some numeric columns arrive as text."""
     if v is None or v == "":
         return None
     try:

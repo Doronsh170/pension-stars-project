@@ -22,7 +22,7 @@ Outputs: analysis/events.csv          (one row per signal-year winner + follow-u
 import csv, os, statistics
 from collections import defaultdict
 
-from source import FAMILIES, RISK_ORDER
+from source import FAMILIES, TRACK_ORDER
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 IN = os.path.join(HERE, "annual_returns.csv")
@@ -34,13 +34,14 @@ FIRST_YEAR = 2010           # study focuses on signal years from 2010 onward
 LAST_COMPLETE_YEAR = 2025   # 2026 is only a partial year in the raw data
 
 # The comparison group is the fund family a saver picks (study fund, provident,
-# investment provident, child savings) crossed with the fund's risk level. Two
-# funds only compete for the same money if they sit in the same cell, so the
-# ranking never rewards a fund merely for carrying more equity than its rivals.
+# investment provident, child savings) crossed with the fund's investment track
+# (`מסלול ממופה`). Two funds only compete for the same money if they sit in the
+# same cell, so the ranking never rewards a fund merely for carrying more equity
+# than its rivals.
 
-# category string = "<family> | <risk level>", matching build_annual.py.
+# category string = "<family> | <track>", matching build_annual.py.
 CATEGORIES = {
-    "gemel": [f"{fam} | {risk}" for fam in FAMILIES for risk in RISK_ORDER],
+    "gemel": [f"{fam} | {track}" for fam in FAMILIES for track in TRACK_ORDER],
 }
 
 
@@ -58,6 +59,15 @@ def load():
         data[key].setdefault(y, []).append(
             (r["fund_id"], r["fund_name"], float(r["annual_return"])))
     return data
+
+
+def load_assets():
+    """(fund_id, year) -> December total assets, in millions of shekels."""
+    out = {}
+    for r in csv.DictReader(open(IN, encoding="utf-8-sig")):
+        if r["assets_end"]:
+            out[(r["fund_id"], int(r["year"]))] = float(r["assets_end"])
+    return out
 
 
 def ranked(funds):
@@ -78,6 +88,7 @@ def percentile(rank, n):
 
 def main():
     data = load()
+    assets = load_assets()
 
     events = []           # detailed rows
     # pooled follow-up percentiles by horizon (for the persistence question)
@@ -108,6 +119,7 @@ def main():
                     "domain": domain, "category": cat, "signal_year": Y,
                     "winner_fund_id": win_fid, "winner_name": win_name,
                     "signal_return": round(win_ret, 2), "signal_n": len(s),
+                    "winner_assets": assets.get((win_fid, Y), ""),
                 }
                 for k in HORIZONS:
                     Yk = Y + k
@@ -193,7 +205,7 @@ def main():
 
     # ---- write events ----
     fields = ["domain", "category", "signal_year", "winner_fund_id", "winner_name",
-              "signal_return", "signal_n"]
+              "signal_return", "signal_n", "winner_assets"]
     for k in HORIZONS:
         fields += [f"y{k}_year", f"y{k}_status", f"y{k}_return", f"y{k}_rank",
                    f"y{k}_n", f"y{k}_percentile"]
