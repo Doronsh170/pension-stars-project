@@ -22,6 +22,7 @@ Input : annual_returns.csv        Output: console report + robustness_summary.cs
 """
 import csv, os, statistics, random, math
 import chase_analysis as ca
+from source import FAMILY_LABEL
 
 random.seed(20260724)
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -29,9 +30,8 @@ B = 20000  # bootstrap resamples
 
 
 def family(domain, cat):
-    if cat.startswith("קרנות השתלמות"): return "קרן השתלמות"
-    if cat.startswith("תגמולים"):       return "קופת גמל"
-    return "קרן פנסיה"
+    """The saver-facing name of the fund family the category belongs to."""
+    return FAMILY_LABEL.get(cat.split(" | ")[0], cat.split(" | ")[0])
 
 
 def boot_ci(xs, h0, stat=statistics.mean):
@@ -104,8 +104,8 @@ def collect():
                 avg = statistics.mean(rets)
                 vanished = win not in info
                 chase = info[win][1] if not vanished else avg
-                track = cat.split(" | ")[1] if " | " in cat else cat
-                diffs.append({"family": fam, "label": f"{fam} · {track}",
+                risk = cat.split(" | ")[1] if " | " in cat else cat
+                diffs.append({"family": fam, "label": f"{fam} · {risk}",
                               "gap": chase - avg, "vanished": vanished})
     return persist, persist_stress, beatmed, still1, rand1, diffs
 
@@ -170,9 +170,11 @@ def main():
 
     print("-- main (vanished winner falls back to category average) --")
     report("ALL", diffs)
-    for fam in ("קרן השתלמות", "קופת גמל"):
-        report(fam, [d for d in diffs if d["family"] == fam])
-    print("-- per category (headline claim is about the 'כללי' tracks) --")
+    for fam in FAMILY_LABEL.values():
+        rows = [d for d in diffs if d["family"] == fam]
+        if rows:
+            report(fam, rows)
+    print("-- per category (family x risk level) --")
     for lab in sorted({d["label"] for d in diffs}):
         report(lab, [d for d in diffs if d["label"] == lab])
     print("-- survivorship stress (drop years where the winner had closed) --")

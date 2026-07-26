@@ -5,6 +5,10 @@ Robustness check: are the yearly category winners simply the higher-risk funds
 (more equity, more volatility)?  If so, the apparent "chasing edge" is a risk
 premium harvested in a rising market, not persistence of skill.
 
+This matters more under the risk-level grouping than it did under a track
+grouping: a band like `בינוני` still spans roughly 25-75% equity, so there is
+real room inside a category for the winner to simply be the boldest fund.
+
 Risk proxies (year-end snapshot, size-independent):
   * equity share  = STOCK_MARKET_EXPOSURE / TOTAL_ASSETS * 100
   * volatility     = STANDARD_DEVIATION
@@ -13,36 +17,17 @@ We report the winner's within-category percentile on each proxy
 """
 import csv, os, statistics
 from collections import defaultdict
-import openpyxl
 
-HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
-SOURCES = [
-    ("gemel-mapped-2010-2025.xlsx", "ראשי", "gemel"),
-]
+from source import HERE, iter_data, num
 
 # (domain,fund_id,year) -> {month: (equity_pct, std)}
 risk = defaultdict(dict)
-for fname, sheet, domain in SOURCES:
-    wb = openpyxl.load_workbook(os.path.join(ROOT, fname), read_only=True, data_only=True)
-    ws = wb[sheet]; it = ws.iter_rows(values_only=True); h = list(next(it))
-    idx = {x: i for i, x in enumerate(h)}
-    se = idx.get('STOCK_MARKET_EXPOSURE'); sd = idx.get('STANDARD_DEVIATION')
-    ta = idx.get('TOTAL_ASSETS'); fi = idx['FUND_ID']
-    pi = idx.get('REPORT_PERIOD'); pi = pi if pi is not None else idx['תקופת דיווח']
-    for r in it:
-        p = r[pi]
-        if not p: continue
-        if hasattr(p, "year"):
-            y, mo = p.year, p.month
-        else:
-            p = str(p); y = int(p[:4]); mo = int(p[4:6])
-        eq = None
-        if se is not None and ta is not None and r[se] is not None and r[ta] not in (None, 0):
-            try: eq = float(r[se]) / float(r[ta]) * 100
-            except ZeroDivisionError: eq = None
-        std = float(r[sd]) if (sd is not None and r[sd] is not None) else None
-        risk[(domain, str(r[fi]), y)][mo] = (eq, std)
-    wb.close()
+for r in iter_data(["FUND_ID", "STOCK_MARKET_EXPOSURE", "TOTAL_ASSETS",
+                    "STANDARD_DEVIATION"]):
+    assets, exposure = num(r["TOTAL_ASSETS"]), num(r["STOCK_MARKET_EXPOSURE"])
+    eq = exposure / assets * 100 if (assets and exposure is not None) else None
+    risk[("gemel", str(r["FUND_ID"]), r["year"])][r["month"]] = (
+        eq, num(r["STANDARD_DEVIATION"]))
 
 def yearend(domain, fid, y, which):
     d = risk.get((domain, str(fid), y), {})
