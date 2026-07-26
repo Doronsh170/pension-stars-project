@@ -22,12 +22,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 def read(n): return list(csv.DictReader(open(os.path.join(HERE, n), encoding="utf-8-sig")))
 events = read("events.csv"); strat = read("strategy_summary.csv"); risk = read("risk_summary.csv")
 
-from source import FAMILIES, FAMILY_LABEL, RISK_ORDER
+from source import FAMILIES, FAMILY_LABEL, TRACK_ORDER
 _present = {(e["domain"], e["category"]) for e in events}
 CAT_ORDER = [
-    ("gemel", f"{fam} | {risk}")
-    for fam in FAMILIES for risk in RISK_ORDER
-    if ("gemel", f"{fam} | {risk}") in _present
+    ("gemel", f"{fam} | {track}")
+    for fam in FAMILIES for track in TRACK_ORDER
+    if ("gemel", f"{fam} | {track}") in _present
 ]
 def family(c):
     head = c.split(" | ")[0]
@@ -104,25 +104,32 @@ for d,c in CAT_ORDER:
                  "sret":float(e["signal_return"]),"sn":int(e["signal_n"]),
                  "k1":cellobj(e,1),"k2":cellobj(e,2),"k3":cellobj(e,3)} for e in rows]})
 
+# ---- the headline numbers of question 3, straight from the same CSVs ----
+GAPS = [float(s["gap_annualized_pp"]) for s in strat]
+N_CATS = str(len(GAPS))
+N_POS = str(sum(1 for g in GAPS if g > 0))          # categories where chasing won
+N_SMALL = str(sum(1 for g in GAPS if abs(g) < 1))   # ...and in how many, barely
+MEAN_GAP = f"{statistics.mean(GAPS):+.2f}".replace("-", "\u2212")
+
+def _gap_on_track(track):
+    """Mean chase-minus-stay gap on one track, pooled over the families."""
+    vals = [float(s["gap_annualized_pp"]) for s in strat
+            if s["category"].split(" | ")[1] == track]
+    return statistics.mean(vals) if vals else 0.0
+
+# The widest and the narrowest track. The text names them rather than claiming
+# a trend across tracks, which these numbers do not show.
+_by_track = sorted(((_gap_on_track(t), t) for t in TRACK_ORDER
+                    if any(s["category"].endswith(" | " + t) for s in strat)),
+                   reverse=True)
+WIDE_GAP = f"{_by_track[0][0]:+.2f}".replace("-", "\u2212")
+WIDE_TRACK = _by_track[0][1]
+NARROW_GAP = f"{_by_track[-1][0]:+.2f}".replace("-", "\u2212")
+NARROW_TRACK = _by_track[-1][1]
+
 DATA=json.dumps({"persist":persist,"strat":strat_data,"cats":cats,
                  "pooled_vol":pooled_vol,"total":TOTAL_EVENTS,
-                 "risk_order":RISK_ORDER},ensure_ascii=False)
-
-def _gap_at_risk(level):
-    """Mean chase-minus-stay gap at one risk level, pooled over the families."""
-    vals = [float(s["gap_annualized_pp"]) for s in strat
-            if s["category"].split(" | ")[1] == level]
-    if not vals:
-        return "—"
-    return f"{statistics.mean(vals):+.2f}".replace("-", "\u2212")
-# The headline contrast is the solid end of the risk scale against the bold end:
-# that is where the chase gap goes from ~nothing to its largest values.
-LOW_RISK, HIGH_RISK = RISK_ORDER[0], RISK_ORDER[-1]
-SOLID_GAP = _gap_at_risk(LOW_RISK)
-BOLD_GAP = _gap_at_risk(HIGH_RISK)
-N_SOLID = sum(1 for s in strat
-              if s["category"].split(" | ")[1] in RISK_ORDER[:2]
-              and float(s["gap_annualized_pp"]) <= 1)
+                 "track_order":TRACK_ORDER,"wide_track":WIDE_TRACK},ensure_ascii=False)
 
 HTML = r"""<!doctype html>
 <html lang="he" dir="rtl">
@@ -261,6 +268,8 @@ tr.closed td{color:var(--faint);font-style:italic}
 .foot{margin-top:48px;padding-top:20px;border-top:1px solid var(--line);
   font-size:12.5px;color:var(--faint);line-height:1.7}
 .foot code{background:var(--line2);padding:1px 6px;border-radius:5px;font-size:12px}
+.disclosure{text-align:center;max-width:62ch;margin-inline:auto}
+.disclosure .credit{margin-top:10px;text-align:center}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -271,13 +280,13 @@ tr.closed td{color:var(--faint);font-style:italic}
 <div class="masthead"><div class="wrap">
   <div class="kicker">מחקר תיאורי · שוק החיסכון ארוך הטווח</div>
   <h1>מה קרה בפועל לקופות שהובילו בתשואה?</h1>
-  <p class="dek">חוסך בוחן בכל תחילת שנה את טבלת התשואות של אשתקד, מזהה את המובילה
-    בקטגוריה שלו ומעביר אליה את כספו. עקבנו אחרי אותן קופות מובילות, בהפרדה בין
-    קרן השתלמות לקופת גמל, כדי להציג באופן אובייקטיבי כיצד התנהגו בשנים שאחרי.</p>
+  <p class="dek">בכל תחילת שנה בחרתי את הקופה שהשיגה את התשואה הגבוהה ביותר בשנה
+    שחלפה, ובדקתי איך הסתדרה בשלוש השנים הבאות. ההשוואה היא תמיד מול קופות באותה
+    משפחת מוצר ובאותו מסלול השקעה, ולא מול כל השוק.</p>
   <div class="sourceline">
     <span><b>מקור:</b> גמל-נט (רשות שוק ההון)</span>
-    <span><b>תקופה:</b> שנות איתות <span class="num">2010–2024</span> · מעקב עד <span class="num">2025</span></span>
-    <span><b>היקף:</b> <span class="num" id="catCount">13</span> קטגוריות · <span class="num" id="evCount">70</span> אירועי איתות</span>
+    <span><b>תקופה:</b> שנות איתות <span class="num">2010-2024</span> · מעקב עד <span class="num">2025</span></span>
+    <span><b>היקף:</b> <span class="num" id="catCount">21</span> קטגוריות · <span class="num" id="evCount">70</span> אירועי איתות</span>
   </div>
 </div></div>
 
@@ -294,12 +303,12 @@ tr.closed td{color:var(--faint);font-style:italic}
   <section>
     <div class="eyebrow">שאלה 01 · שמירת מעמד</div>
     <h2>האם המובילות שומרות על מעמדן?</h2>
-    <p class="body">עקבנו אחרי כל קופה שדורגה ראשונה, אל תוך שלוש השנים שאחרי. בשנה
-      שאחרי האיתות <span class="emteal" id="s_no1">12%</span> מהמובילות בלבד חזרו למקום
-      הראשון, וכ־<span id="s_top3">27%</span> נשארו בשלושת הראשונים. במקביל,
+    <p class="body">עקבתי אחרי כל קופה שדורגה ראשונה, אל תוך שלוש השנים שאחרי. בשנה
+      שאחרי האיתות רק <span class="emteal" id="s_no1">12%</span> מהמובילות חזרו למקום
+      הראשון, ובערך <span id="s_top3">27%</span> נשארו בשלושת הראשונים. במקביל
       <span class="em" id="s_bot">38%</span> ירדו כבר לאחר שנה אל המחצית התחתונה של
-      הקטגוריה, וכ־<span class="em" id="s_van">10%</span> כלל לא שרדו כקופה נפרדת (נסגרו
-      או מוזגו). לאורך זמן שיעור החזרה למקום הראשון יורד ושיעור ההיעלמות עולה.</p>
+      הקטגוריה, ועוד <span class="em" id="s_van">10%</span> כלל לא שרדו כקופה נפרדת
+      (נסגרו או מוזגו). ככל שחולף הזמן שיעור החזרה למקום הראשון יורד ושיעור ההיעלמות עולה.</p>
     <div class="figure">
       <div class="cap">לאן הגיעה מובילת אשתקד: פילוח מלא (100%) של כלל המובילות לפי
         מיקומן בקטגוריה לאחר שנה, שנתיים ושלוש. כל פס מתחלק לחמישה מצבים נפרדים
@@ -314,13 +323,13 @@ tr.closed td{color:var(--faint);font-style:italic}
     <div class="eyebrow">שאלה 02 · דירוג אופייני</div>
     <h2>מהו הדירוג האופייני לאחר 1, 2, 3 שנים?</h2>
     <p class="body">מבין הקופות ששרדו, הדירוג האופייני (החציוני) של מובילת אשתקד בשנה
-      שאחרי הוא כ־<span class="emteal" id="s_medrank">מקום 10 מתוך 36</span>, סביב
-      השליש העליון של הקטגוריה, לא סמוך למקום הראשון. האחוזון הממוצע גבוה מ־50 אך הולך
-      ומתכנס אל עבר האמצע ככל שחולף הזמן.</p>
+      שאחרי הוא <span class="emteal" id="s_medrank">מקום 10 מתוך 36</span>, סביב
+      השליש העליון של הקטגוריה, לא סמוך למקום הראשון. האחוזון הממוצע גבוה מאמצע
+      הקטגוריה, אך מתקרב אליו ככל שחולף הזמן.</p>
     <div class="figure">
       <div class="cap">אחוזון הדירוג של המובילה בשנים שאחרי (100 = מקום ראשון, 50 = אמצע
-        הקטגוריה), ממוצע וחציון. קו ה־50 מסמן דירוג ממוצע ("ללא יתרון").</div>
-      <svg id="chartPctile" viewBox="0 0 720 300" role="img"
+        הקטגוריה), ממוצע וחציון. הקו המקווקו בגובה 50 מסמן דירוג ממוצע, כלומר ללא יתרון.</div>
+      <svg id="chartPctile" viewBox="0 0 720 310" role="img"
         aria-label="אחוזון הדירוג של המובילה לאורך שלוש שנים"></svg>
       <div class="legend">
         <span><i class="dot" style="background:var(--teal)"></i> אחוזון ממוצע</span>
@@ -334,33 +343,31 @@ tr.closed td{color:var(--faint);font-style:italic}
   <section>
     <div class="eyebrow">שאלה 03 · יתרון עקבי</div>
     <h2>האם נמצא יתרון עקבי?</h2>
-    <p class="body"><b>(א) תוצאה כספית.</b> חוסך ש<span class="emteal">רודף</span> (עובר
-      בכל שנה למובילת אשתקד) מול חוסך ש<span class="emteal">נשאר</span> בממוצע הקטגוריה.
-      גודל הפער אינו אחיד — הוא <span class="em">עולה עם רמת הסיכון</span> של
-      הקטגוריה: ברמת הסיכון <span class="em">__LOWRISK__</span> הוא כמעט נעלם
-      (כ־<span class="num">__SOLIDGAP__</span> נק' לשנה), וברמת הסיכון
-      <span class="em">__HIGHRISK__</span> הוא מגיע לכ־<span class="num">__BOLDGAP__</span>
-      נק'. כלומר הרווח לכאורה מרוכז דווקא בקטגוריות שבתוכן נותר מרחב סיכון גדול,
-      ולא בקטגוריות שבהן כל הקופות דומות זו לזו.</p>
+    <p class="body"><b>(א) התוצאה הכספית.</b> השוויתי שתי התנהגויות: חוסך
+      ש<span class="emteal">רודף</span>, כלומר עובר בכל שנה למובילת אשתקד, מול חוסך
+      ש<span class="emteal">נשאר</span> בממוצע הקטגוריה. הפער לטובת הרודף קטן ולא אחיד:
+      בממוצע <span class="num">__MEANGAP__</span> נקודות אחוז לשנה, וברוב הקטגוריות
+      (<span class="num">__NSMALL__</span> מתוך <span class="num">__NCATS__</span>)
+      הוא קטן מנקודה אחת לשנה. הוא הגדול
+      ביותר במסלול <span class="em">__WIDETRACK__</span>
+      (<span class="num">__WIDEGAP__</span> נק') והקטן ביותר במסלול
+      <span class="em">__NARROWTRACK__</span> (<span class="num">__NARROWGAP__</span> נק').</p>
     <div class="figure">
       <div class="cap">פער התשואה השנתית (CAGR) בין "רודף" ל"נשאר", לפי קטגוריה. עמודה
         זהובה (שמאלה) = יתרון לרודף; עמודה חמרה (ימינה) = יתרון לנשאר. בנקודות אחוז.</div>
       <svg id="chartGap" viewBox="0 0 720 430" role="img"
         aria-label="פער התשואה בין רדיפה להישארות לפי קטגוריה"></svg>
     </div>
-    <p class="body"><b>(ב) הקשר לסיכון.</b> <b>איך מדדנו סיכון?</b> לכל קופה יש
-      <b>סטיית תקן</b> — מדד לתנודתיות: כמה התשואה שלה "קופצת" מעלה ומטה. לכל קופה מובילה
-      בדקנו היכן היא ממוקמת בתוך הקטגוריה שלה במונחי תנודתיות, בסולם אחוזון:
-      <span class="num">50</span> = תנודתיות ממוצעת לקטגוריה, <span class="num">100</span> =
-      הקופה התנודתית (המסוכנת) ביותר בקבוצה. המובילה יושבת בממוצע באחוזון
-      <span class="emteal" id="volInline">67</span> — כלומר נוטה להיות מהתנודתיות יותר
-      בקבוצתה, גם אחרי שהשווינו רק קופות באותה רמת סיכון. רמת סיכון היא סרגל גס:
-      בתוך רמה אחת עדיין נכנסות קופות בעלות אופי שונה, והמובילה נוטה להיות זו שבקצה
-      הנועז של הרמה. מאחר שהתקופה כללה בעיקר שנים של עליות, אותן קופות השיגו בממוצע
-      תשואות גבוהות יותר — כך שחלק מהפער שבסעיף (א) משקף סיכון, ולא בהכרח התמדה של ביצועים.</p>
+    <p class="body"><b>(ב) הקשר לסיכון.</b> כדי לבדוק אם הפער הזה הוא בכלל תשלום על
+      סיכון, מדדתי לכל מובילה את התנודתיות שלה, כלומר כמה התשואה שלה קופצת מעלה ומטה,
+      והשוויתי אותה לשאר הקופות באותה קטגוריה. בסולם אחוזון, שבו 50 היא תנודתיות ממוצעת
+      ואילו 100 היא הקופה התנודתית ביותר בקבוצה, המובילה יושבת בממוצע על
+      <span class="emteal" id="volInline">61</span>. כלומר גם בתוך מסלול אחיד, המובילה
+      נוטה להיות הקופה הנועזת יותר. מכיוון שהתקופה כללה בעיקר שנים של עליות בשווקים,
+      חלק מהפער שבסעיף (א) עשוי לשקף סיכון גדול יותר ולא התמדה של ביצועים.</p>
     <div class="figure">
-      <div class="cap">אחוזון התנודתיות (סטיית התקן) של המובילה בתוך הקטגוריה
-        (50 = תנודתיות ממוצעת, 100 = המסוכנת ביותר בקבוצה).</div>
+      <div class="cap">אחוזון התנודתיות של המובילה בתוך הקטגוריה
+        (50 = תנודתיות ממוצעת, 100 = התנודתית ביותר בקבוצה).</div>
       <svg id="chartRisk" viewBox="0 0 720 400" role="img"
         aria-label="אחוזון התנודתיות של המובילות לפי קטגוריה"></svg>
     </div>
@@ -369,16 +376,15 @@ tr.closed td{color:var(--faint);font-style:italic}
   <section>
     <div class="eyebrow">אמינות</div>
     <h2>עד כמה הממצא מוצק?</h2>
-    <p class="body">בדקנו אם התוצאות אמיתיות או סתם "מזל" אקראי. בקצרה:
-      <b>היתרון של מובילת אשתקד קטן, לא יציב, ונעלם בתוך שלוש שנים</b> — וברמות
-      הסיכון הסולידיות כמעט שאין הבדל בין "רודף" ל"נשאר". חשוב מכך:
-      היתרון מופיע רק כשמתעלמים מהקופות שנסגרו בדרך; מרגע שמכניסים גם אותן לחשבון,
-      הוא נעלם.</p>
+    <p class="body">בדקתי במבחנים סטטיסטיים אם התוצאות אמיתיות או סתם מזל אקראי.
+      בקצרה: היתרון של מובילת אשתקד מובהק בשנה הראשונה ובשנייה, אבל
+      <b>הוא קטן, לא אחיד בין הקטגוריות, ונעלם עד השנה השלישית</b>. כשמכניסים לחשבון גם
+      את הקופות שנסגרו או מוזגו בדרך, גם היתרון של השנים הראשונות נחלש.</p>
   </section>
 
   <section>
     <div class="eyebrow">הנתונים המלאים</div>
-    <h2>מעקב שנה־אחר־שנה, לפי קטגוריה</h2>
+    <h2>מעקב שנה אחר שנה, לפי קטגוריה</h2>
     <p class="body">לכל שנת איתות: הקופה שהובילה, תשואתה, והתשואה והדירוג שלה (מקום מתוך
       מספר הקופות בקטגוריה) בכל אחת משלוש השנים שאחרי.</p>
     <div id="tables"></div>
@@ -388,42 +394,33 @@ tr.closed td{color:var(--faint);font-style:italic}
     <h2>תמצית הממצאים</h2>
     <p class="body">הנתונים ההיסטוריים מצביעים על התמונה הבאה, המוצגת כעובדות:</p>
     <ol>
-      <li><b>שמירת מעמד חלקית וזמנית.</b> רק כ־<span id="c_no1">10%</span> מהמובילות חזרו
-        למקום הראשון בשנה שאחרי, כ־<span id="c_bot">49%</span> ירדו למחצית התחתונה, ובתוך
-        שלוש שנים כ־<span id="c_van3">40%</span> מהן נסגרו או מוזגו.</li>
+      <li><b>שמירת מעמד חלקית וזמנית.</b> רק <span id="c_no1">10%</span> מהמובילות חזרו
+        למקום הראשון בשנה שאחרי, <span id="c_bot">49%</span> ירדו למחצית התחתונה, ובתוך
+        שלוש שנים <span id="c_van3">40%</span> מהן נסגרו או מוזגו.</li>
       <li><b>הדירוג האופייני הוא "טוב מהממוצע", לא "מוביל".</b> מובילת אשתקד מדורגת
-        בשנה שאחרי סביב השליש העליון, והאחוזון הממוצע מתכנס אל עבר האמצע עם הזמן.</li>
-      <li><b>היתרון הכספי אינו אחיד — הוא עולה עם רמת הסיכון.</b> ברמה
-        <span class="em">__LOWRISK__</span> הפער כמעט נעלם
-        (<span class="num">__SOLIDGAP__</span> נק' לשנה), וברמה
-        <span class="em">__HIGHRISK__</span> הוא מגיע לכ־<span class="num">__BOLDGAP__</span>
-        נק'. גם בתוך רמת סיכון נתונה המובילה נוטה להיות הקופה התנודתית יותר,
-        בתקופה של שווקים עולים.</li>
+        בשנה שאחרי סביב השליש העליון, והאחוזון הממוצע מתקרב אל האמצע עם הזמן.</li>
+      <li><b>היתרון הכספי קטן ולא אחיד.</b> בממוצע
+        <span class="num">__MEANGAP__</span> נקודות אחוז לשנה, וברוב הקטגוריות פחות
+        מנקודה אחת. הוא הגדול ביותר במסלול <span class="em">__WIDETRACK__</span>, וגם
+        בתוך מסלול אחיד המובילה נוטה להיות הקופה התנודתית יותר, בתקופה של שווקים עולים.</li>
     </ol>
     <p class="body">הנתונים המלאים והקוד בתיקיית <code>analysis/</code>. לקורא/ת נותרת
       ההחלטה כיצד לשקלל ממצאים אלה.</p>
   </div>
 
-  <div class="foot">
-    שחזור: <code>build_risk_levels.py</code> → <code>build_annual.py</code> → <code>chase_analysis.py</code> →
-    <code>risk_check.py</code> → <code>robustness.py</code> → <code>make_report.py</code> / <code>build_html.py</code>.
-    נכללות רק קופות הפתוחות לכלל הציבור; קופות סקטוריאליות, מגזריות וסגורות (וכן עוטפי
-    IRA וקופות דמי מחלה) הוצאו מהמדגם. תשואה שנתית חושבה משרשור התשואות החודשיות; נכללו
-    רק שנים עם 12 חודשי דיווח. הסימולציה הכספית אינה מנכה דמי ניהול, מס ועלויות מעבר.
-  </div>
-  <div class="foot" style="border-top:none;padding-top:0;margin-top:12px">
+  <div class="foot disclosure">
     <b>גילוי נאות:</b> התוכן נועד למידע כללי ולמטרות לימודיות בלבד, ואינו מהווה ייעוץ
     או שיווק פנסיוני או השקעות ואינו תחליף לייעוץ אישי המתחשב בנתוניו ובצרכיו של כל אדם.
-    הנתונים מבוססים על מקורות פומביים (גמל-נט) וייתכנו בהם אי־דיוקים.
+    הנתונים מבוססים על מקורות פומביים (גמל-נט) וייתכנו בהם אי דיוקים.
     ביצועי עבר אינם מעידים על העתיד.
-    <div style="margin-top:10px">מאת: דורון שרייבמן</div>
+    <div class="credit">מאת: דורון שרייבמן</div>
   </div>
 </div>
 
 <script>
 const D=__DATA__;
-/* the boldest risk band — the one carrying the headline gap, emphasised in charts */
-const TOP_RISK=D.risk_order[D.risk_order.length-1];
+/* the track carrying the widest chase-vs-stay gap, emphasised in the charts */
+const TOP_TRACK=D.wide_track;
 const NS="http://www.w3.org/2000/svg";
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 function el(t,a){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;}
@@ -480,36 +477,40 @@ function txt(x,y,s,o={}){const t=el("text",{x,y,...o});t.textContent=s;return t;
     `<span><i class="dot" style="background:${s.col}"></i> ${s.lab}</span>`).join("");
 })();
 
-/* ---- Q2: percentile line (mean + median) ---- */
+/* ---- Q2: percentile chart, mean + median side by side ----
+   Grouped bars rather than two lines: every value gets its own printed label
+   above its own bar, so no number can end up sitting on a line or behind a
+   marker however close the two series run. ---- */
 (function(){
   const svg=document.getElementById("chartPctile");
-  const W=720,H=300,mL=44,mR=44,mT=24,mB=52;
+  const W=720,H=300,mL=48,mR=28,mT=26,mB=54;
   const iw=W-mL-mR, ih=H-mT-mB;
-  const xs=D.persist.map((_,i)=>mL+iw*(i+0.5)/D.persist.length);
   const y=v=>mT+ih*(1-v/100);
+  const gw=iw/D.persist.length, bw=52, gap=10;
   [0,25,50,75,100].forEach(g=>{
     svg.appendChild(el("line",{x1:mL,x2:W-mR,y1:y(g),y2:y(g),
       stroke:g===50?css("--base"):css("--line"),"stroke-width":g===50?1.5:1,
       "stroke-dasharray":g===50?"5 4":""}));
-    svg.appendChild(txt(mL-10,y(g)+4,g,{fill:css("--faint"),"font-size":11,"text-anchor":"end"}));
+    svg.appendChild(txt(mL-10,y(g)+4,g,{fill:css("--faint"),"font-size":11,
+      "text-anchor":"middle"}));
   });
-  svg.appendChild(txt(W-mR+8,y(50)+4,"50",{fill:css("--base"),"font-size":11,"font-weight":700}));
-  const line=(key,col,dash)=>{
-    const p=D.persist.map((d,i)=>[xs[i],y(d[key])]);
-    svg.appendChild(el("path",{d:"M"+p.map(q=>q.join(",")).join(" L"),fill:"none",
-      stroke:col,"stroke-width":dash?2.5:3,"stroke-dasharray":dash||"",
-      "stroke-linecap":"round","stroke-linejoin":"round"}));
-  };
-  line("med_pctile",css("--gold"),"2 5");
-  line("pctile",css("--teal"),null);
   D.persist.forEach((d,i)=>{
-    svg.appendChild(el("circle",{cx:xs[i],cy:y(d.med_pctile),r:4,fill:css("--gold")}));
-    svg.appendChild(el("circle",{cx:xs[i],cy:y(d.pctile),r:5.5,fill:css("--teal")}));
-    svg.appendChild(txt(xs[i],y(d.pctile)-13,Math.round(d.pctile),{fill:css("--teal"),
-      "font-size":14,"font-weight":800,"text-anchor":"middle"}));
-    svg.appendChild(txt(xs[i],H-mB+26,"שנה +"+d.h,{fill:css("--muted"),"font-size":13,
+    const cx=mL+gw*(i+0.5);
+    [[d.pctile,css("--teal"),-1],[d.med_pctile,css("--gold"),1]].forEach(([v,col,side])=>{
+      const x=cx+side*(gap/2)-(side<0?bw:0), h=y(50-Math.abs(v-50))-y(50);
+      // bars grow out of the 50 line: upward above the middle, downward below
+      const top=v>=50?y(v):y(50);
+      svg.appendChild(el("rect",{x:x,y:top,width:bw,height:Math.max(2,h),rx:4,
+        fill:col,opacity:.92}));
+      svg.appendChild(txt(x+bw/2,(v>=50?top-9:top+h+19),Math.round(v),
+        {fill:col,"font-size":14,"font-weight":800,"text-anchor":"middle",
+         style:"direction:ltr"}));
+    });
+    svg.appendChild(txt(cx,H-mB+30,"שנה +"+d.h,{fill:css("--muted"),"font-size":13,
       "font-weight":700,"text-anchor":"middle"}));
   });
+  svg.appendChild(txt(mL+62,y(50)+19,"אמצע הקטגוריה",{fill:css("--base"),
+    "font-size":11,"font-weight":700,"text-anchor":"middle"}));
 })();
 
 /* stat cards (Q2) */
@@ -527,7 +528,7 @@ function txt(x,y,s,o={}){const t=el("text",{x,y,...o});t.textContent=s;return t;
 })();
 
 /* Build a family-grouped row layout: a bold header per family, then its
-   risk-level rows (labelled by risk level only). Returns {rows, H}. */
+   track rows (labelled by track only). Returns {rows, H}. */
 function grouped(items,opt){
   const mT=opt.mT, hH=opt.hH, rowH=opt.rowH, gapH=opt.gapH;
   let y=mT, out=[], lastFam=null;
@@ -537,9 +538,9 @@ function grouped(items,opt){
   });
   return {rows:out, H:y+opt.mB};
 }
-const riskOf=d=>d.label.split(" · ").slice(1).join(" · ");
+const trackOf=d=>d.label.split(" · ").slice(1).join(" · ");
 
-/* ---- gap chart: diverging bars, grouped by family, risk labels on right ---- */
+/* ---- gap chart: diverging bars, grouped by family, track labels on right ---- */
 (function(){
   const svg=document.getElementById("chartGap");
   const items=D.strat;
@@ -549,7 +550,9 @@ const riskOf=d=>d.label.split(" · ").slice(1).join(" · ");
   const maxGap=Math.max(...items.map(d=>d.gap)), minGap=Math.min(...items.map(d=>d.gap));
   const xLab=W-12;                 // risk labels: right edge (rtl -> flows left)
   const x0=362;                    // zero baseline
-  const scale=Math.min((x0-72)/(maxGap*1.1), 150/(Math.abs(minGap)*1.15));
+  // the right-hand column holds the track names, so a negative bar plus its
+  // value label must stay well short of it
+  const scale=Math.min((x0-72)/(maxGap*1.1), 110/(Math.abs(minGap)*1.15));
   svg.appendChild(el("line",{x1:x0,x2:x0,y1:opt.mT,y2:H-opt.mB,stroke:css("--ink"),"stroke-width":1.5}));
   rows.forEach(it=>{
     if("header" in it){
@@ -558,9 +561,9 @@ const riskOf=d=>d.label.split(" · ").slice(1).join(" · ");
       svg.appendChild(el("line",{x1:60,x2:xLab,y1:it.y+28,y2:it.y+28,stroke:css("--line"),"stroke-width":1}));
       return;
     }
-    const d=it.d, bh=20, by=it.y+(opt.rowH-bh)/2, bold=riskOf(d)===TOP_RISK, neg=d.gap<0;
+    const d=it.d, bh=20, by=it.y+(opt.rowH-bh)/2, bold=trackOf(d)===TOP_TRACK, neg=d.gap<0;
     const col=neg?css("--clay"):css("--gold"), span=Math.abs(d.gap)*scale;
-    svg.appendChild(txt(xLab,by+bh/2+5,riskOf(d),{fill:css("--ink"),"font-size":14,
+    svg.appendChild(txt(xLab,by+bh/2+5,trackOf(d),{fill:css("--ink"),"font-size":14,
       "font-weight":bold?800:600,"text-anchor":"start"}));
     svg.appendChild(el("rect",{x:neg?x0:x0-span,y:by,width:Math.max(1.5,span),height:bh,rx:4,fill:col,opacity:.95}));
     const lx=neg?x0+span+7:x0-span-7;
@@ -579,9 +582,14 @@ const riskOf=d=>d.label.split(" · ").slice(1).join(" · ");
   const W=720, opt={mT:14,mB:38,hH:30,rowH:30,gapH:12};
   const {rows,H}=grouped(items,opt);
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
-  const xLab=W-12, xL=56, xR=W-196, base=50, mn=40, mx=100;
+  const xLab=W-12, xL=56, xR=W-196, base=50;
+  // the axis follows the data: a percentile below 40 used to fall off the panel
+  const vals=items.map(d=>d.vol);
+  const mn=Math.max(0,Math.floor((Math.min(...vals)-6)/10)*10);
+  const mx=Math.min(100,Math.ceil((Math.max(...vals)+6)/10)*10);
   const x=v=>xL+(xR-xL)*(v-mn)/(mx-mn);
-  [40,50,60,70,80,90,100].forEach(g=>{
+  const ticks=[]; for(let g=mn;g<=mx;g+=10) ticks.push(g);
+  ticks.forEach(g=>{
     svg.appendChild(el("line",{x1:x(g),x2:x(g),y1:opt.mT,y2:H-opt.mB,
       stroke:g===base?css("--base"):css("--line"),"stroke-width":g===base?1.5:1,
       "stroke-dasharray":g===base?"5 4":""}));
@@ -595,9 +603,9 @@ const riskOf=d=>d.label.split(" · ").slice(1).join(" · ");
         "font-weight":800,"text-anchor":"start"}));
       return;
     }
-    const d=it.d, cy=it.y+opt.rowH/2, bold=riskOf(d)===TOP_RISK;
+    const d=it.d, cy=it.y+opt.rowH/2, bold=trackOf(d)===TOP_TRACK;
     const col=bold?css("--teal"):css("--gold");
-    svg.appendChild(txt(xLab,cy+5,riskOf(d),{fill:css("--ink"),"font-size":14,
+    svg.appendChild(txt(xLab,cy+5,trackOf(d),{fill:css("--ink"),"font-size":14,
       "font-weight":bold?800:600,"text-anchor":"start"}));
     svg.appendChild(el("line",{x1:x(base),x2:x(d.vol),y1:cy,y2:cy,stroke:col,"stroke-width":2.5,opacity:.5}));
     svg.appendChild(el("circle",{cx:x(d.vol),cy:cy,r:6,fill:col}));
@@ -612,7 +620,7 @@ document.getElementById("volInline").textContent=Math.round(D.pooled_vol);
 (function(){
   const wrap=document.getElementById("tables");
   function cell(c){
-    if(!c) return '<span style="color:var(--faint)">—</span>';
+    if(!c) return '<span style="color:var(--faint)">אין נתון</span>';
     if(c.closed) return '<span style="color:var(--faint);font-style:italic">נסגרה</span>';
     const dir=c.ret>=0?"up":"down";
     const top=c.rank<=Math.ceil(c.n/4), low=c.rank>c.n/2;
@@ -628,12 +636,12 @@ document.getElementById("volInline").textContent=Math.round(D.pooled_vol);
       wrap.appendChild(h); lastFam=cat.fam;
     }
     const det=document.createElement("details"); if(idx<3)det.open=true;
-    const riskLevel=cat.label.split(" · ").slice(1).join(" · ");
+    const track=cat.label.split(" · ").slice(1).join(" · ");
     let rows=cat.rows.map(r=>`<tr><td class="y num">${r.y}</td>
       <td class="name">${r.name}</td>
       <td class="num" style="font-weight:700;color:var(--gold)">+${r.sret.toFixed(1)}%</td>
       <td>${cell(r.k1)}</td><td>${cell(r.k2)}</td><td>${cell(r.k3)}</td></tr>`).join("");
-    det.innerHTML=`<summary><span>${riskLevel||cat.label}</span>
+    det.innerHTML=`<summary><span>${track||cat.label}</span>
       <span class="chev">▸</span></summary>
       <div class="tbl-scroll"><table>
       <colgroup><col class="c-year"><col class="c-name"><col class="c-sig">
@@ -651,8 +659,10 @@ document.getElementById("volInline").textContent=Math.round(D.pooled_vol);
 
 open(os.path.join(HERE, "report.html"), "w", encoding="utf-8").write(
     HTML.replace("__DATA__", DATA)
-        .replace("__LOWRISK__", LOW_RISK).replace("__HIGHRISK__", HIGH_RISK)
-        .replace("__SOLIDGAP__", SOLID_GAP).replace("__BOLDGAP__", BOLD_GAP))
+        .replace("__MEANGAP__", MEAN_GAP).replace("__NSMALL__", N_SMALL)
+        .replace("__NCATS__", N_CATS).replace("__NPOS__", N_POS)
+        .replace("__WIDETRACK__", WIDE_TRACK).replace("__WIDEGAP__", WIDE_GAP)
+        .replace("__NARROWTRACK__", NARROW_TRACK).replace("__NARROWGAP__", NARROW_GAP))
 print("wrote report.html")
 
 # =====================================================================
@@ -709,31 +719,41 @@ def _outcome(e):
         return "bottom"
     return "mid"
 
-# A deliberately varied set: some kept winning, some slid to mid-pack, some
-# collapsed, some closed. Picked from the most competitive category-years
-# (largest fields), one card per fund, so the mix is illustrative and stable.
-EXAMPLE_MIX = ["kept", "bottom", "top", "bottom", "kept", "mid",
-               "bottom", "top", "closed", "bottom"]
-
 def _full_followup(e):
     """Every card shows three follow-up years, so only fully-tracked winners."""
     return all(e.get(f"y{k}_status") in ("present", "absent") for k in (1, 2, 3))
 
+# The cards are meant to be recognisable, so they are drawn from the largest
+# funds of the recent years rather than from the whole 2010-2025 history. The
+# outcome mix is whatever those funds actually did — no archetype is forced in.
+EXAMPLE_FIRST_YEAR = 2016
+N_EXAMPLES = 8
+
+def _house(name):
+    """First word of the fund name — a good enough stand-in for the manager,
+    used only to keep one house from taking over the card grid."""
+    return name.split()[0] if name.split() else name
+
 def _pick_examples():
-    pool = sorted((e for e in events if _outcome(e) and _full_followup(e)),
-                  key=lambda e: (-int(e["signal_n"]), e["category"], e["signal_year"]))
-    picked, used_funds, used_cats = [], set(), []
-    for want in EXAMPLE_MIX:
-        for e in pool:
-            if _outcome(e) != want or e["winner_name"] in used_funds:
-                continue
-            # spread the cards over categories: no third card from one category
-            if used_cats.count(e["category"]) >= 2:
-                continue
-            picked.append((e["domain"], e["category"], e["signal_year"]))
-            used_funds.add(e["winner_name"])
-            used_cats.append(e["category"])
+    pool = [e for e in events
+            if _outcome(e) and _full_followup(e) and e["winner_assets"]
+            and int(e["signal_year"]) >= EXAMPLE_FIRST_YEAR]
+    pool.sort(key=lambda e: -float(e["winner_assets"]))
+    picked, used_funds, used_houses, used_cats = [], set(), [], []
+    for e in pool:
+        if len(picked) >= N_EXAMPLES:
             break
+        if e["winner_name"] in used_funds:
+            continue
+        if used_houses.count(_house(e["winner_name"])) >= 2:
+            continue
+        if used_cats.count(e["category"]) >= 2:
+            continue
+        picked.append((e["domain"], e["category"], e["signal_year"]))
+        used_funds.add(e["winner_name"])
+        used_houses.append(_house(e["winner_name"]))
+        used_cats.append(e["category"])
+    picked.sort(key=lambda k: k[2])
     return picked
 
 EXAMPLES = _pick_examples()
@@ -768,10 +788,9 @@ IDX = {
     "bot":   f"{round(p1['bot'])}%",
     "rank":  f"{p1['med_rank']}",
     "n":     f"{p1['med_n']}",
-    "lowrisk":  LOW_RISK,    # solid end of the risk scale
-    "highrisk": HIGH_RISK,   # bold end
-    "solidgap": SOLID_GAP,   # mean chase-minus-stay gap there, e.g. −0.04
-    "boldgap":  BOLD_GAP,
+    "meangap": MEAN_GAP,     # mean chase-minus-stay gap across the categories
+    "nsmall":  N_SMALL,      # ...of which this many are under a point a year
+    "ncats":   N_CATS,
     "van1":  f"{round(p1['vanished'])}%",
     "van3":  f"{round(persist[2]['vanished'])}%",
     "events": str(TOTAL_EVENTS),
@@ -894,11 +913,11 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
 <main class="card">
   <div class="kicker">חיסכון ארוך טווח · נתוני רשות שוק ההון</div>
   <h1>מה קרה לקופות שהובילו בתשואה בשנים שלאחר מכן?</h1>
-  <p class="lede">בכל תחילת שנה זיהינו את הקופה שהשיגה את התשואה הגבוהה ביותר בקטגוריה
-    שלה בשנה שחלפה, מבין מאות קופות גמל והשתלמות הפתוחות לכלל הציבור, ועקבנו
-    אחר הדירוג והתשואה שלה בשלוש השנים הבאות. כל קופה מושווית רק מול קופות
-    <b>באותה משפחת מוצר ובאותה רמת סיכון</b>.</p>
-  <p class="framing">בדיקה תיאורית: היא מתארת מה קרה בפועל, ואינה המלצה לפעולה.</p>
+  <p class="lede">בכל תחילת שנה בחרתי את הקופה שהשיגה את התשואה הגבוהה ביותר בקטגוריה
+    שלה בשנה שחלפה, מתוך מאות קופות גמל והשתלמות הפתוחות לכלל הציבור, ובדקתי איפה
+    דורגה בשלוש השנים הבאות. כל קופה מושווית רק מול קופות
+    <b>באותה משפחת מוצר ובאותו מסלול השקעה</b>.</p>
+  <p class="framing">זו בדיקה תיאורית: היא מתארת מה קרה בפועל, ואינה המלצה לפעולה.</p>
 
   <div class="divider"></div>
 
@@ -926,31 +945,31 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
       <span><i class="dot" style="background:var(--teal)"></i> מחצית עליונה של הקטגוריה</span>
       <span><i class="dot" style="background:var(--clay)"></i> מחצית תחתונה</span>
     </div>
-    <div class="cap fine">בנוסף, שיעור הקופות שנסגרו או מוזגו עלה מכ־<span class="num">__VAN1__</span>
-      בשנה הראשונה לכ־<span class="num">__VAN3__</span> עד השנה השלישית.</div>
+    <div class="cap fine">בנוסף, שיעור הקופות שנסגרו או מוזגו עלה מ<span class="num">__VAN1__</span>
+      בשנה הראשונה ל<span class="num">__VAN3__</span> עד השנה השלישית.</div>
   </div>
 
   <div class="example">
     <div class="sec-eyebrow teal">דוגמאות מוחשיות: קופה אחת לאורך זמן</div>
-    <p class="ex-intro">כל דוגמה עוקבת אחרי קופה שסיימה במקום הראשון בקטגוריה שלה
-      בשנה מסוימת — מתוך הקטגוריות הצפופות ביותר, שבהן התחרות על המקום הראשון הגדולה
-      ביותר — ומראה היכן דורגה שנה, שנתיים ושלוש שנים לאחר מכן. לעיתים שמרה על מקומה,
-      לעיתים צנחה, ולעיתים אף נסגרה.</p>
+    <p class="ex-intro">כל דוגמה עוקבת אחרי קופה גדולה ומוכרת שסיימה במקום הראשון
+      בקטגוריה שלה, ומראה היכן דורגה שנה, שנתיים ושלוש שנים לאחר מכן. לעיתים שמרה על
+      מקומה, ולעיתים צנחה אל תחתית הקטגוריה.</p>
     <div class="ex-grid">__EX_CARDS__</div>
-    <p class="ex-note">להמחשה בלבד. המעקב המלא, בכל הקטגוריות ובכל השנים, נמצא במחקר המלא.</p>
+    <p class="ex-note">הקופות הגדולות ביותר שהובילו בקטגוריה שלהן משנת 2016 ואילך,
+      להמחשה בלבד. המעקב המלא, בכל הקטגוריות ובכל השנים, נמצא במחקר המלא.</p>
   </div>
 
   <section class="summary">
     <div class="sec-eyebrow teal">מה נראה מהנתונים (בזהירות)</div>
     <p>מובילות העבר שומרות על מעמדן באופן חלקי וזמני בלבד: רק מיעוט חוזרות לצמרת, ורבות
       מהן צונחות בהמשך או אף נסגרות.</p>
-    <p>היתרון הכספי <b>אינו אחיד — הוא עולה עם רמת הסיכון</b>. ברמת הסיכון
-      <b>__LOWRISK__</b> הפער בין "רודף" ל"נשאר" כמעט נעלם
-      (<span class="num">__SOLIDGAP__</span> נק' לשנה), וברמת הסיכון <b>__HIGHRISK__</b>
-      הוא מגיע לכ־<span class="num">__BOLDGAP__</span> נק'. גם בתוך רמת סיכון נתונה,
-      המובילה נוטה להיות הקופה התנודתית יותר בקבוצתה — ומאחר שהתקופה התאפיינה בעיקר
+    <p>היתרון הכספי של הרודף <b>קטן ולא אחיד</b>: בממוצע
+      <span class="num">__MEANGAP__</span> נקודות אחוז לשנה, וברוב הקטגוריות
+      (<span class="num">__NSMALL__</span> מתוך <span class="num">__NCATS__</span>)
+      פחות מנקודה אחת. גם בתוך מסלול
+      אחיד המובילה נוטה להיות הקופה התנודתית יותר בקבוצתה, ומאחר שהתקופה התאפיינה בעיקר
       בעליות בשווקים, <b>ייתכן</b> שחלק מהפער משקף סיכון ולא בהכרח התמדה בביצועים.</p>
-    <p>בדקנו את הממצאים גם במבחנים סטטיסטיים, והמסקנות מחזיקות. הפירוט המלא במחקר.</p>
+    <p>בדקתי את הממצאים גם במבחנים סטטיסטיים. הפירוט המלא במחקר.</p>
     <p class="fine">הבדיקה תיאורית ואינה מנכה דמי ניהול, מס ועלויות מעבר. ההחלטה כיצד
       לשקלל את הממצאים נותרת בידי הקורא.</p>
   </section>
@@ -959,17 +978,17 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
     <a class="btn" href="analysis/report.html">
       <span>למחקר המלא, למתודולוגיה ולטבלאות</span><span class="ar">←</span>
     </a>
-    <div class="subnote">טבלאות שנה־אחר־שנה לכל קטגוריה · ניתוח סיכון · הקוד המלא</div>
+    <div class="subnote">טבלאות שנה אחר שנה לכל קטגוריה · ניתוח סיכון · הקוד המלא</div>
   </div>
 
   <div class="src">
     <span><b>מקור:</b> גמל-נט (רשות שוק ההון)</span> ·
-    <span><b>תקופה:</b> <span class="num">2010–2025</span></span> ·
+    <span><b>תקופה:</b> <span class="num">2010-2025</span></span> ·
     <span><b>היקף:</b> <span class="num">__EVENTS__</span> אירועי איתות, <span class="num">__NCAT__</span> קטגוריות</span>
   </div>
   <p class="disclaimer">גילוי נאות: התוכן נועד למידע כללי ולמטרות לימודיות בלבד, ואינו
     מהווה ייעוץ או שיווק פנסיוני או השקעות ואינו תחליף לייעוץ אישי המתחשב בנתוניו ובצרכיו
-    של כל אדם. הנתונים מבוססים על מקור פומבי (גמל-נט) וייתכנו בהם אי־דיוקים.
+    של כל אדם. הנתונים מבוססים על מקור פומבי (גמל-נט) וייתכנו בהם אי דיוקים.
     ביצועי עבר אינם מעידים על העתיד.</p>
   <p class="credit">מאת: דורון שרייבמן</p>
 </main>
@@ -978,9 +997,8 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
 
 idx_out = INDEX
 for k, v in {"__NO1__":IDX["no1"], "__BOT__":IDX["bot"], "__RANK__":IDX["rank"],
-             "__N__":IDX["n"], "__LOWRISK__":IDX["lowrisk"],
-             "__HIGHRISK__":IDX["highrisk"], "__SOLIDGAP__":IDX["solidgap"],
-             "__BOLDGAP__":IDX["boldgap"],
+             "__N__":IDX["n"], "__MEANGAP__":IDX["meangap"],
+             "__NSMALL__":IDX["nsmall"], "__NCATS__":IDX["ncats"],
              "__VAN1__":IDX["van1"], "__VAN3__":IDX["van3"],
              "__EVENTS__":IDX["events"], "__NCAT__":str(len(CAT_ORDER)),
              "__CHART__":IDX["chart"],

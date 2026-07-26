@@ -104,8 +104,8 @@ def collect():
                 avg = statistics.mean(rets)
                 vanished = win not in info
                 chase = info[win][1] if not vanished else avg
-                risk = cat.split(" | ")[1] if " | " in cat else cat
-                diffs.append({"family": fam, "label": f"{fam} · {risk}",
+                track = cat.split(" | ")[1] if " | " in cat else cat
+                diffs.append({"family": fam, "label": f"{fam} · {track}",
                               "gap": chase - avg, "vanished": vanished})
     return persist, persist_stress, beatmed, still1, rand1, diffs
 
@@ -174,7 +174,7 @@ def main():
         rows = [d for d in diffs if d["family"] == fam]
         if rows:
             report(fam, rows)
-    print("-- per category (family x risk level) --")
+    print("-- per category (family x track) --")
     for lab in sorted({d["label"] for d in diffs}):
         report(lab, [d for d in diffs if d["label"] == lab])
     print("-- survivorship stress (drop years where the winner had closed) --")

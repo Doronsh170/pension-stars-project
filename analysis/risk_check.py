@@ -5,13 +5,18 @@ Robustness check: are the yearly category winners simply the higher-risk funds
 (more equity, more volatility)?  If so, the apparent "chasing edge" is a risk
 premium harvested in a rising market, not persistence of skill.
 
-This matters more under the risk-level grouping than it did under a track
-grouping: a band like `בינוני` still spans roughly 25-75% equity, so there is
-real room inside a category for the winner to simply be the boldest fund.
+A track is a coarse ruler: `כללי/מעורב/גמיש/תלוי גיל`, for instance, holds
+funds with very different equity shares, so there is real room inside a
+category for the winner to simply be the boldest fund on the track.
 
-Risk proxies (year-end snapshot, size-independent):
-  * equity share  = STOCK_MARKET_EXPOSURE / TOTAL_ASSETS * 100
-  * volatility     = STANDARD_DEVIATION
+Risk proxies, both size-independent:
+  * equity share = STOCK_MARKET_EXPOSURE / TOTAL_ASSETS * 100, at year end.
+  * volatility   = the standard deviation of the fund's own 12 monthly returns
+    in that year, annualised (x sqrt(12)). The extract also carries a reported
+    STANDARD_DEVIATION column, but it is present for only ~55% of the monthly
+    rows, which leaves several categories with a pool of two or three funds and
+    a meaningless percentile. Computing it from the monthly yields covers every
+    complete fund-year and is measured the same way for all of them.
 We report the winner's within-category percentile on each proxy
 (50 = no tilt, 100 = always the riskiest in its category).
 """
@@ -20,21 +25,31 @@ from collections import defaultdict
 
 from source import HERE, iter_data, num
 
-# (domain,fund_id,year) -> {month: (equity_pct, std)}
-risk = defaultdict(dict)
-for r in iter_data(["FUND_ID", "STOCK_MARKET_EXPOSURE", "TOTAL_ASSETS",
-                    "STANDARD_DEVIATION"]):
-    assets, exposure = num(r["TOTAL_ASSETS"]), num(r["STOCK_MARKET_EXPOSURE"])
-    eq = exposure / assets * 100 if (assets and exposure is not None) else None
-    risk[("gemel", str(r["FUND_ID"]), r["year"])][r["month"]] = (
-        eq, num(r["STANDARD_DEVIATION"]))
+MIN_POOL = 6   # a percentile below this many peers is noise, not a measurement
 
-def yearend(domain, fid, y, which):
-    d = risk.get((domain, str(fid), y), {})
-    for m in range(12, 0, -1):
-        if m in d and d[m][which] is not None:
-            return d[m][which]
-    return None
+# (domain,fund_id,year) -> {month: equity_pct}, plus the monthly return series
+equity = defaultdict(dict)
+monthly = defaultdict(dict)
+for r in iter_data(["FUND_ID", "STOCK_MARKET_EXPOSURE", "TOTAL_ASSETS",
+                    "MONTHLY_YIELD"]):
+    key = ("gemel", str(r["FUND_ID"]), r["year"])
+    assets, exposure = num(r["TOTAL_ASSETS"]), num(r["STOCK_MARKET_EXPOSURE"])
+    if assets and exposure is not None:
+        equity[key][r["month"]] = exposure / assets * 100
+    y = num(r["MONTHLY_YIELD"])
+    if y is not None:
+        monthly[key][r["month"]] = y
+
+def yearend_equity(domain, fid, y):
+    d = equity.get((domain, str(fid), y), {})
+    return d[max(d)] if d else None
+
+def realized_vol(domain, fid, y):
+    """Annualised standard deviation of the fund's 12 monthly returns."""
+    d = monthly.get((domain, str(fid), y), {})
+    if len(d) < 12:
+        return None
+    return statistics.stdev(d.values()) * (12 ** 0.5)
 
 ann = list(csv.DictReader(open(os.path.join(HERE, "annual_returns.csv"), encoding="utf-8-sig")))
 cat_members = defaultdict(list)
@@ -45,19 +60,18 @@ events = list(csv.DictReader(open(os.path.join(HERE, "events.csv"), encoding="ut
 
 def pctile(val, pool):
     pool = [x for x in pool if x is not None]
-    if val is None or len(pool) < 4: return None
+    if val is None or len(pool) < MIN_POOL: return None
     below = sum(1 for x in pool if x < val)
     return below / (len(pool) - 1) * 100
 
 per_cat = defaultdict(lambda: {"eq": [], "vol": []})
 for e in events:
     dom, cat, Y = e["domain"], e["category"], int(e["signal_year"])
-    if Y < 2008: continue
     members = cat_members.get((dom, cat, Y), [])
-    eq_pool = [yearend(dom, m, Y, 0) for m in members]
-    vol_pool = [yearend(dom, m, Y, 1) for m in members]
-    eqp = pctile(yearend(dom, e["winner_fund_id"], Y, 0), eq_pool)
-    volp = pctile(yearend(dom, e["winner_fund_id"], Y, 1), vol_pool)
+    eq_pool = [yearend_equity(dom, m, Y) for m in members]
+    vol_pool = [realized_vol(dom, m, Y) for m in members]
+    eqp = pctile(yearend_equity(dom, e["winner_fund_id"], Y), eq_pool)
+    volp = pctile(realized_vol(dom, e["winner_fund_id"], Y), vol_pool)
     if eqp is not None: per_cat[(dom, cat)]["eq"].append(eqp)
     if volp is not None: per_cat[(dom, cat)]["vol"].append(volp)
 
