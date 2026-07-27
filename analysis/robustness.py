@@ -185,18 +185,21 @@ def main():
     # An average that survives only because of two exceptional years is not the
     # same finding as one spread over the period, so the two years that carry
     # the most of it are identified by their share of the total and dropped.
-    print("-- year concentration (gap by follow-up year) --")
-    years = sorted({d["year"] for d in diffs})
+    # Measured on the surviving winners, the same basis the pages quote.
+    print("-- year concentration (survivors, gap by follow-up year) --")
+    years = sorted({d["year"] for d in surv})
     contrib = {}
     for y in years:
-        g = [d["gap"] for d in diffs if d["year"] == y]
+        g = [d["gap"] for d in surv if d["year"] == y]
         contrib[y] = sum(g)
         print(f"   {y}: n={len(g):>3}  mean {statistics.mean(g):+.2f}pp  "
               f"sum {sum(g):+.1f}")
     top2 = sorted(contrib, key=lambda y: -contrib[y])[:2]
-    rest = [d for d in diffs if d["year"] not in top2]
-    print(f"   the two years carrying most of it: {', '.join(map(str, sorted(top2)))}")
-    report(f"ALL excl {'_'.join(str(y) for y in sorted(top2))}", rest)
+    share = sum(contrib[y] for y in top2) / sum(contrib.values()) * 100
+    rest = [d for d in surv if d["year"] not in top2]
+    print(f"   the two years carrying most of it: {', '.join(map(str, sorted(top2)))}"
+          f"  ({share:.0f}% of the total)")
+    report(f"ALL survivors excl {'_'.join(str(y) for y in sorted(top2))}", rest)
 
     with open(os.path.join(HERE, "robustness_summary.csv"), "w", newline="", encoding="utf-8-sig") as f:
         w = csv.DictWriter(f, fieldnames=["test", "n", "estimate", "ci_low", "ci_high", "p_vs_null", "null"])
