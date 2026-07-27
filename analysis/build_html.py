@@ -294,13 +294,22 @@ td.y{font-weight:700;color:var(--gold)}
 .badge.low{background:#B4472C1f;color:var(--clay)}
 tr.closed td{color:var(--faint);font-style:italic}
 
-.conc{margin-top:56px;border-top:2px solid var(--ink);padding-top:34px}
+/* the closing summary, in the same card the landing page uses */
+.conc{background:var(--raised);border:1px solid var(--line);border-radius:16px;
+  box-shadow:var(--shadow);padding:26px 28px;margin-top:56px;
+  position:relative;overflow:hidden}
+.conc::before{content:"";position:absolute;inset-inline-start:0;top:0;bottom:0;
+  width:4px;background:var(--teal)}
+.conc h2{margin-top:0}
 .conc ol{padding-inline-start:22px;margin:18px 0}
 .conc li{margin:12px 0}
 .foot{margin-top:48px;padding-top:20px;border-top:1px solid var(--line);
   font-size:12.5px;color:var(--faint);line-height:1.7}
 .foot code{background:var(--line2);padding:1px 6px;border-radius:5px;font-size:12px}
 .disclosure{text-align:center;max-width:62ch;margin-inline:auto}
+.disclosure-title{margin:0 0 7px;text-align:center;font-size:14px;font-weight:800;
+  color:var(--muted)}
+.disclosure p{margin:0}
 .disclosure .credit{margin-top:10px;text-align:center}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -393,7 +402,7 @@ tr.closed td{color:var(--faint);font-style:italic}
     <p class="body"><b>(ב) הקשר לסיכון.</b> גם בתוך מסלול אחיד המובילה נוטה להיות
       הקופה שהתשואה שלה קופצת יותר מעלה ומטה מרוב הקופות בקטגוריה שלה. מכיוון שהתקופה
       כללה בעיקר שנים של עליות בשווקים, ייתכן שחלק מהפער שבסעיף (א) הוא תשלום על סיכון
-      ולא התמדה של ביצועים. הפירוט המספרי נמצא ב-<span class="em">risk_summary.csv</span>.</p>
+      ולא התמדה של ביצועים.</p>
   </section>
 
   <section>
@@ -437,10 +446,11 @@ tr.closed td{color:var(--faint);font-style:italic}
   </div>
 
   <div class="foot disclosure">
-    <b>גילוי נאות:</b> התוכן נועד למידע כללי ולמטרות לימודיות בלבד, ואינו מהווה ייעוץ
+    <div class="disclosure-title">גילוי נאות</div>
+    <p>התוכן נועד למידע כללי ולמטרות לימודיות בלבד, ואינו מהווה ייעוץ
     או שיווק פנסיוני או השקעות ואינו תחליף לייעוץ אישי המתחשב בנתוניו ובצרכיו של כל אדם.
     הנתונים מבוססים על מקורות פומביים (גמל-נט) וייתכנו בהם אי דיוקים.
-    ביצועי עבר אינם מעידים על העתיד.
+    ביצועי עבר אינם מעידים על העתיד.</p>
     <div class="credit">מאת: דורון שרייבמן</div>
   </div>
 </div>
