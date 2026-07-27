@@ -154,6 +154,20 @@ tr.closed td{color:var(--faint);font-style:italic}
   color:var(--muted)}
 .disclosure p{margin:0}
 .disclosure .credit{margin-top:10px;text-align:center}
+
+/* phones: claw back the width the padding was eating, and let the tables
+   scroll instead of being crushed */
+@media(max-width:640px){
+  .wrap{padding:0 16px}
+  .backbar{padding:20px 16px 0}
+  .figure{padding:14px 14px 12px;border-radius:12px;margin:16px 0}
+  .figure .cap{font-size:12.5px;margin-bottom:12px}
+  /* the six-column table cannot fit a phone; give it a real width and let
+     the existing .tbl-scroll wrapper scroll it horizontally */
+  .tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tbl-scroll table{min-width:560px}
+  thead th{white-space:nowrap}
+}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -196,7 +210,7 @@ tr.closed td{color:var(--faint);font-style:italic}
       <div class="cap">לאן הגיעה מובילת אשתקד: פילוח מלא (100%) של כלל המובילות לפי
         מיקומן בקטגוריה לאחר שנה, שנתיים ושלוש. כל פס מתחלק לחמישה מצבים נפרדים
         (מימין לשמאל: מהטוב לפחות טוב).</div>
-      <svg id="chartKeep" viewBox="0 0 720 260" role="img"
+      <svg id="chartKeep" role="img"
         aria-label="פילוח מיקום המובילות לאורך שלוש שנים"></svg>
       <div class="legend" id="keepLegend"></div>
     </div>
@@ -212,7 +226,7 @@ tr.closed td{color:var(--faint);font-style:italic}
     <div class="figure">
       <div class="cap">אחוזון הדירוג של המובילה בשנים שאחרי (100 = מקום ראשון, 50 = אמצע
         הקטגוריה), ממוצע וחציון. הקו המקווקו בגובה 50 מסמן דירוג ממוצע, כלומר ללא יתרון.</div>
-      <svg id="chartPctile" viewBox="0 0 720 310" role="img"
+      <svg id="chartPctile" role="img"
         aria-label="אחוזון הדירוג של המובילה לאורך שלוש שנים"></svg>
       <div class="legend">
         <span><i class="dot" style="background:var(--teal)"></i> אחוזון ממוצע</span>
@@ -252,6 +266,17 @@ const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim
 function el(t,a){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;}
 function txt(x,y,s,o={}){const t=el("text",{x,y,...o});t.textContent=s;return t;}
 
+/* Narrow viewBox on phones. Font sizes inside the SVG stay fixed, so a
+   smaller viewBox makes them larger relative to the chart — the labels
+   become legible without colliding. */
+const NARROW = window.matchMedia("(max-width:640px)").matches;
+const CHART_W = NARROW ? 380 : 720;
+/* At 360px the 380 viewBox renders at ~0.78 scale, which drops an 11-unit
+   axis label to 8.6 real pixels — under the legibility floor. The axis
+   labels sit in their own margin with room to spare, so this one tier is
+   raised to clear 9px. Everything else stays put. */
+const AXIS_FS = NARROW ? 12 : 11;
+
 /* ---- inline figures ---- */
 (function(){
   const p1=D.persist[0];
@@ -280,7 +305,7 @@ function txt(x,y,s,o={}){const t=el("text",{x,y,...o});t.textContent=s;return t;
     {v:d=>d.seg.bot,             lab:"ירדו למחצית התחתונה",col:css("--clay")},
     {v:d=>d.seg.closed,          lab:"נסגרו / מוזגו",      col:css("--base")},
   ];
-  const W=720, top=16, rowH=46, gap=30, R=W-124, L=54, TW=R-L;
+  const W=CHART_W, top=16, rowH=46, gap=30, R=W-124, L=54, TW=R-L;
   const H=top+D.persist.length*(rowH+gap);
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
   const hlab=["אחרי שנה","אחרי שנתיים","אחרי 3 שנים"];
@@ -311,15 +336,18 @@ function txt(x,y,s,o={}){const t=el("text",{x,y,...o});t.textContent=s;return t;
    marker however close the two series run. ---- */
 (function(){
   const svg=document.getElementById("chartPctile");
-  const W=720,H=300,mL=48,mR=28,mT=26,mB=54;
+  const W=CHART_W,H=300,mT=26,mB=54;
+  const mL=NARROW?34:48, mR=NARROW?16:28;
   const iw=W-mL-mR, ih=H-mT-mB;
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
   const y=v=>mT+ih*(1-v/100);
-  const gw=iw/D.persist.length, bw=52, gap=10;
+  // bar width follows the group slot, so the pair never outgrows its column
+  const gw=iw/D.persist.length, gap=NARROW?6:10, bw=Math.min(52,(gw-gap)*0.4);
   [0,25,50,75,100].forEach(g=>{
     svg.appendChild(el("line",{x1:mL,x2:W-mR,y1:y(g),y2:y(g),
       stroke:g===50?css("--base"):css("--line"),"stroke-width":g===50?1.5:1,
       "stroke-dasharray":g===50?"5 4":""}));
-    svg.appendChild(txt(mL-10,y(g)+4,g,{fill:css("--faint"),"font-size":11,
+    svg.appendChild(txt(mL-10,y(g)+4,g,{fill:css("--faint"),"font-size":AXIS_FS,
       "text-anchor":"middle"}));
   });
   D.persist.forEach((d,i)=>{
@@ -338,7 +366,7 @@ function txt(x,y,s,o={}){const t=el("text",{x,y,...o});t.textContent=s;return t;
       "font-weight":700,"text-anchor":"middle"}));
   });
   svg.appendChild(txt(mL+62,y(50)+19,"אמצע הקטגוריה",{fill:css("--base"),
-    "font-size":11,"font-weight":700,"text-anchor":"middle"}));
+    "font-size":AXIS_FS,"font-weight":700,"text-anchor":"middle"}));
 })();
 
 /* stat cards (Q2) */
@@ -373,21 +401,22 @@ const trackOf=d=>d.label.split(" · ").slice(1).join(" · ");
   const svg=document.getElementById("chartGap");
   if(!svg) return;
   const items=D.strat;
-  const W=720, opt={mT:12,mB:40,hH:30,rowH:30,gapH:12};
+  const W=CHART_W, opt={mT:12,mB:40,hH:30,rowH:30,gapH:12};
   const {rows,H}=grouped(items,opt);
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const S=W/720;                   // the x offsets below were tuned against 720
   const maxGap=Math.max(...items.map(d=>d.gap)), minGap=Math.min(...items.map(d=>d.gap));
   const xLab=W-12;                 // risk labels: right edge (rtl -> flows left)
-  const x0=362;                    // zero baseline
+  const x0=362*S;                  // zero baseline
   // the right-hand column holds the track names, so a negative bar plus its
   // value label must stay well short of it
-  const scale=Math.min((x0-72)/(maxGap*1.1), 110/(Math.abs(minGap)*1.15));
+  const scale=Math.min((x0-72*S)/(maxGap*1.1), 110*S/(Math.abs(minGap)*1.15));
   svg.appendChild(el("line",{x1:x0,x2:x0,y1:opt.mT,y2:H-opt.mB,stroke:css("--ink"),"stroke-width":1.5}));
   rows.forEach(it=>{
     if("header" in it){
       svg.appendChild(txt(xLab,it.y+21,it.header,{fill:css("--ink"),"font-size":15.5,
         "font-weight":800,"text-anchor":"start"}));
-      svg.appendChild(el("line",{x1:60,x2:xLab,y1:it.y+28,y2:it.y+28,stroke:css("--line"),"stroke-width":1}));
+      svg.appendChild(el("line",{x1:60*S,x2:xLab,y1:it.y+28,y2:it.y+28,stroke:css("--line"),"stroke-width":1}));
       return;
     }
     const d=it.d, bh=20, by=it.y+(opt.rowH-bh)/2, bold=trackOf(d)===TOP_TRACK, neg=d.gap<0;
@@ -400,8 +429,8 @@ const trackOf=d=>d.label.split(" · ").slice(1).join(" · ");
       {fill:col,"font-size":13.5,"font-weight":800,"text-anchor":neg?"start":"end",style:"direction:ltr"}));
   });
   svg.appendChild(txt(x0,H-opt.mB+22,"0",{fill:css("--muted"),"font-size":12,"text-anchor":"middle","font-weight":700}));
-  svg.appendChild(txt(120,H-opt.mB+22,"◄ יתרון לרודף",{fill:css("--faint"),"font-size":12,"text-anchor":"middle"}));
-  svg.appendChild(txt(x0+95,H-opt.mB+22,"יתרון לנשאר ►",{fill:css("--faint"),"font-size":12,"text-anchor":"middle"}));
+  svg.appendChild(txt(120*S,H-opt.mB+22,"◄ יתרון לרודף",{fill:css("--faint"),"font-size":12,"text-anchor":"middle"}));
+  svg.appendChild(txt(x0+95*S,H-opt.mB+22,"יתרון לנשאר ►",{fill:css("--faint"),"font-size":12,"text-anchor":"middle"}));
 })();
 
 /* ---- tracking tables ---- */
