@@ -301,8 +301,16 @@ tr.closed td{color:var(--faint);font-style:italic}
 .conc::before{content:"";position:absolute;inset-inline-start:0;top:0;bottom:0;
   width:4px;background:var(--teal)}
 .conc h2{margin-top:0}
-.conc ol{padding-inline-start:22px;margin:18px 0}
-.conc li{margin:12px 0}
+/* the findings as a tile dashboard, the same one the landing page opens with */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0}
+.stat{background:var(--paper);border:1px solid var(--line2);border-radius:14px;
+  padding:20px 16px;text-align:center}
+.stat .v{font-size:clamp(30px,5vw,38px);font-weight:800;line-height:1;letter-spacing:-.02em}
+.stat.a .v{color:var(--gold)} .stat.b .v{color:var(--teal)} .stat.c .v{color:var(--clay)}
+.stat .l{font-size:13px;color:var(--muted);margin-top:11px;line-height:1.45}
+@media(max-width:720px){.stats{grid-template-columns:1fr;gap:12px}
+  .stat{display:flex;align-items:center;gap:18px;text-align:start;padding:16px 18px}
+  .stat .v{font-size:32px;flex:0 0 auto} .stat .l{margin-top:0}}
 .foot{margin-top:48px;padding-top:20px;border-top:1px solid var(--line);
   font-size:12.5px;color:var(--faint);line-height:1.7}
 .foot code{background:var(--line2);padding:1px 6px;border-radius:5px;font-size:12px}
@@ -435,19 +443,36 @@ tr.closed td{color:var(--faint);font-style:italic}
   <div class="conc">
     <h2>תמצית הממצאים</h2>
     <p class="body">הנתונים ההיסטוריים מצביעים על התמונה הבאה, המוצגת כעובדות:</p>
-    <ol>
-      <li><b>שמירת מעמד חלקית וזמנית.</b> רק <span id="c_no1">10%</span> מהמובילות חזרו
-        למקום הראשון בשנה שאחרי, <span id="c_bot">49%</span> ירדו למחצית התחתונה, ובתוך
-        שלוש שנים <span id="c_van3">40%</span> מהן נסגרו או מוזגו.</li>
-      <li><b>הדירוג האופייני הוא "טוב מהממוצע", לא "מוביל".</b> מובילת אשתקד מדורגת
-        בשנה שאחרי סביב השליש העליון, והאחוזון הממוצע מתקרב אל האמצע עם הזמן.</li>
-      <li><b>היתרון הכספי קטן ולא אחיד.</b> בממוצע
-        <span class="num">__MEANGAP__</span> נקודות אחוז לשנה, וברוב הקטגוריות פחות
-        מנקודה אחת. הוא הגדול ביותר במסלול <span class="em">__WIDETRACK__</span>, וגם
-        בתוך מסלול אחיד המובילה נוטה להיות הקופה התנודתית יותר, בתקופה של שווקים עולים.</li>
-    </ol>
-    <p class="body">הנתונים המלאים והקוד בתיקיית <code>analysis/</code>. לקורא/ת נותרת
-      ההחלטה כיצד לשקלל ממצאים אלה.</p>
+    <div class="stats">
+      <div class="stat a">
+        <div class="v num" id="c_no1">15%</div>
+        <div class="l">מהמובילות חזרו למקום הראשון בשנה שאחרי</div>
+      </div>
+      <div class="stat b">
+        <div class="v num" id="c_rank">6</div>
+        <div class="l">הדירוג החציוני שנה אחרי, מתוך כ-<span class="num" id="c_n">16</span>
+          קופות בקטגוריה</div>
+      </div>
+      <div class="stat c">
+        <div class="v num" id="c_bot">43%</div>
+        <div class="l">ירדו למחצית התחתונה כבר אחרי שנה</div>
+      </div>
+      <div class="stat c">
+        <div class="v num" id="c_van3">18%</div>
+        <div class="l">נעלמו מהקטגוריה בתוך שלוש שנים</div>
+      </div>
+      <div class="stat a">
+        <div class="v num">__MEANGAP__</div>
+        <div class="l">נקודות אחוז לשנה — היתרון המצטבר של הרודף</div>
+      </div>
+      <div class="stat b">
+        <div class="v num">__NSMALL__/__NCATS__</div>
+        <div class="l">הקטגוריות שבהן היתרון קטן מנקודת אחוז אחת</div>
+      </div>
+    </div>
+    <p class="body">היתרון הגדול ביותר נמצא במסלול <span class="em">__WIDETRACK__</span>,
+      וגם בתוך מסלול אחיד המובילה נוטה להיות הקופה התנודתית יותר, בתקופה של שווקים
+      עולים.</p>
   </div>
 
   <div class="foot disclosure">
@@ -476,6 +501,8 @@ function txt(x,y,s,o={}){const t=el("text",{x,y,...o});t.textContent=s;return t;
   document.getElementById("catCount").textContent=D.strat.length;
   const _set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
   _set("c_no1",Math.round(p1.no1)+"%");
+  _set("c_rank",p1.med_rank);
+  _set("c_n",p1.med_n);
   _set("c_bot",Math.round(p1.bot)+"%");
   _set("c_van3",Math.round(D.persist[2].vanished)+"%");
   document.getElementById("s_no1").textContent=Math.round(p1.no1)+"%";
