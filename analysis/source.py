@@ -26,13 +26,18 @@ DATA_XLSX = os.path.join(ROOT, "gemel-2010-2025.xlsx")
 # ranked only against other funds on the same track, so a "winner" is never
 # just the fund that took more equity than its rivals.
 TRACK_ORDER = [
-    "כספי/מבטיח תשואה",
+    "כספי",
     'אג"ח ללא מניות',
     "עד 25% מניות",
     "כללי/מעורב/גמיש/תלוי גיל",
     "מניות פאסיבי",
     "מניות אקטיבי",
 ]
+
+# The workbook's mapping folded the guaranteed-return funds into the money
+# track. Those funds are out of the study (see `guaranteed_return` below), so
+# what is left on that track is money-market only, and it is named accordingly.
+TRACK_RENAME = {"כספי/מבטיח תשואה": "כספי"}
 
 # `אחר` is the residual bucket of the mapping (a handful of foreign-currency
 # tracks, never more than 7 funds in a family-year). It is not a comparison
@@ -77,6 +82,28 @@ def excluded_fund(name):
     return bool(name) and ("בניהול אישי" in name or "IRA" in name or "דמי מחלה" in name)
 
 
+GUARANTEED = "מבטיח תשואה"
+
+
+def guaranteed_return(spec, sub):
+    """Guaranteed-return funds, out of the study.
+
+    These funds (`מנורה מבטחים יותר`, `מיטב ביטחון`, `הפניקס גמולה` and the
+    like) credit a rate fixed in their by-laws — a flat 4.5%/5.5% a year, or
+    the CPI — instead of the return of a portfolio. They are closed to new
+    members, and ranking them against money-market funds compares a promise
+    with a market result: in the near-zero-rate years the promise wins every
+    time, for a reason that says nothing about the manager.
+    """
+    return GUARANTEED in (norm(spec), norm(sub))
+
+
+def track_of(v):
+    """The fund's mapped track, under the study's own naming."""
+    t = norm(v)
+    return TRACK_RENAME.get(t, t)
+
+
 def _data_sheet(wb):
     """The raw monthly sheet — the only one whose header starts with FUND_ID.
 
@@ -103,6 +130,7 @@ def iter_data(fields):
     idx = {h: i for i, h in enumerate(header)}
     want = [(f, idx[f]) for f in fields]
     c_per, c_name = idx["REPORT_PERIOD"], idx["FUND_NAME"]
+    c_spec, c_sub = idx["SPECIALIZATION"], idx["SUB_SPECIALIZATION"]
     for r in it:
         # REPORT_PERIOD is YYYYMM (number in this extract, datetime if re-saved).
         per = r[c_per]
@@ -116,7 +144,7 @@ def iter_data(fields):
                 continue
             year, month = int(per[:4]), int(per[4:6])
         name = norm(r[c_name])
-        if excluded_fund(name):
+        if excluded_fund(name) or guaranteed_return(r[c_spec], r[c_sub]):
             continue
         row = {f: r[i] for f, i in want}
         row["fund_name"] = name

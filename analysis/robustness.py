@@ -106,7 +106,7 @@ def collect():
                 chase = info[win][1] if not vanished else avg
                 track = cat.split(" | ")[1] if " | " in cat else cat
                 diffs.append({"family": fam, "label": f"{fam} · {track}",
-                              "gap": chase - avg, "vanished": vanished})
+                              "year": Y, "gap": chase - avg, "vanished": vanished})
     return persist, persist_stress, beatmed, still1, rand1, diffs
 
 
@@ -180,6 +180,23 @@ def main():
     print("-- survivorship stress (drop years where the winner had closed) --")
     surv = [d for d in diffs if not d["vanished"]]
     report("ALL (survivors only)", surv)
+
+    # -- how much of the gap rests on a couple of calendar years? --
+    # An average that survives only because of two exceptional years is not the
+    # same finding as one spread over the period, so the two years that carry
+    # the most of it are identified by their share of the total and dropped.
+    print("-- year concentration (gap by follow-up year) --")
+    years = sorted({d["year"] for d in diffs})
+    contrib = {}
+    for y in years:
+        g = [d["gap"] for d in diffs if d["year"] == y]
+        contrib[y] = sum(g)
+        print(f"   {y}: n={len(g):>3}  mean {statistics.mean(g):+.2f}pp  "
+              f"sum {sum(g):+.1f}")
+    top2 = sorted(contrib, key=lambda y: -contrib[y])[:2]
+    rest = [d for d in diffs if d["year"] not in top2]
+    print(f"   the two years carrying most of it: {', '.join(map(str, sorted(top2)))}")
+    report(f"ALL excl {'_'.join(str(y) for y in sorted(top2))}", rest)
 
     with open(os.path.join(HERE, "robustness_summary.csv"), "w", newline="", encoding="utf-8-sig") as f:
         w = csv.DictWriter(f, fieldnames=["test", "n", "estimate", "ci_low", "ci_high", "p_vs_null", "null"])

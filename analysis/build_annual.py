@@ -26,7 +26,8 @@ import csv
 import os
 from collections import defaultdict
 
-from source import HERE, FAMILIES, TRACK_ORDER, TRACK_EXCLUDE, iter_data, norm, num
+from source import (HERE, FAMILIES, TRACK_ORDER, TRACK_EXCLUDE, iter_data, norm,
+                    num, track_of)
 
 
 def main():
@@ -37,7 +38,7 @@ def main():
               "YEAR_TO_DATE_YIELD", "TOTAL_ASSETS", "מסלול ממופה"]
     for r in iter_data(fields):
         cls = norm(r["FUND_CLASSIFICATION"])
-        track = norm(r["מסלול ממופה"])
+        track = track_of(r["מסלול ממופה"])
         if cls not in FAMILIES or track in TRACK_EXCLUDE:
             continue
         d = acc[(str(r["FUND_ID"]), r["year"])]
