@@ -134,15 +134,17 @@ def _ranked_universe():
 
 N_FUNDS = str(_ranked_universe())
 
-# The money gap pooled over every leadership event, and the same gap once the
-# two calendar years that carry most of it are dropped (from robustness.py).
+# How much did a leader beat its category average by in the following year, and
+# what is left of that once the two calendar years carrying most of it are
+# dropped (both from robustness.py, over the leaders still in the category).
 def _pp(test):
     return f'{float(rob[test]["estimate"]):+.2f}'.replace("-", "−")
 
-_EXCL = next(t for t in rob if t.startswith("gap_ALL excl "))
+_EXCL = next(t for t in rob if t.startswith("gap_ALL survivors excl "))
 CONC_YEARS = " ו-".join(_EXCL.rsplit(" ", 1)[1].split("_"))
-GAP_EVENTS = _pp("gap_ALL")
+GAP_EVENTS = _pp("gap_ALL (survivors only)")
 GAP_EXCL = _pp(_EXCL)
+N_SIGNALS = str(len(events))     # every leadership event, 2025 included
 
 def _gap_on_track(track):
     """Mean chase-minus-stay gap on one track, pooled over the families."""
@@ -707,38 +709,11 @@ print("wrote report.html")
 
 # =====================================================================
 # Stage 5 - the simple, few-seconds landing page (index.html at repo root).
-# Order of the page: research question -> the data & a descriptive chart ->
-# only then a cautious summary. Same source data as the full report, so the
-# headline numbers stay in sync.
+# Order of the page: research question -> the headline findings -> concrete
+# examples -> only then the conclusion. Same source data as the full report,
+# so the headline numbers stay in sync.
 # =====================================================================
 p1 = persist[0]
-
-def _split_chart(rows):
-    """Descriptive stacked bars: among surviving leaders, the share that stayed
-    in the top half of their category vs. fell to the bottom half, after 1/2/3
-    years. A true partition (segments sum to 100%) so nothing is double-counted."""
-    W, L, R, top, rowH, gap = 640, 44, 596, 20, 30, 42
-    TW = R - L
-    out = [f'<svg viewBox="0 0 {W} 206" role="img" '
-           f'aria-label="דירוג המובילות: מחצית עליונה מול תחתונה לאחר שנה, שנתיים ושלוש">']
-    for i, d in enumerate(rows):
-        y = top + i * (rowH + gap)
-        h, b = d["half"], d["bot"]
-        topW = h / 100 * TW
-        tx = R - topW
-        cy = y + rowH / 2 + 5
-        out += [
-            f'<text x="{R}" y="{y-7}" text-anchor="end" font-size="13" font-weight="700" '
-            f'fill="var(--muted)">שנה +{d["h"]}</text>',
-            f'<rect x="{tx:.1f}" y="{y}" width="{topW:.1f}" height="{rowH}" rx="4" fill="var(--teal)"/>',
-            f'<rect x="{L}" y="{y}" width="{tx-L:.1f}" height="{rowH}" rx="4" fill="var(--clay)"/>',
-            f'<text x="{(tx+R)/2:.1f}" y="{cy:.1f}" text-anchor="middle" font-size="13" '
-            f'font-weight="800" fill="#fff" style="direction:ltr">{round(h)}%</text>',
-            f'<text x="{(L+tx)/2:.1f}" y="{cy:.1f}" text-anchor="middle" font-size="13" '
-            f'font-weight="800" fill="#fff" style="direction:ltr">{round(b)}%</text>',
-        ]
-    out.append('</svg>')
-    return "".join(out)
 
 # ---- concrete illustrations: follow ONE winning fund through time. Each card
 #      names the fund and the year it finished #1 in its category, then shows how
@@ -827,17 +802,13 @@ IDX = {
     "no1":   f"{round(p1['no1'])}%",
     "bot":   f"{round(p1['bot'])}%",
     "rank":  f"{p1['med_rank']}",
-    "n":     f"{p1['med_n']}",
-    "meangap": MEAN_GAP,     # mean chase-minus-stay gap across the categories
-    "nsmall":  N_SMALL,      # ...of which this many are under a point a year
-    "ncats":   N_CATS,
     "van1":  f"{round(p1['vanished'])}%",
     "van3":  f"{round(persist[2]['vanished'])}%",
-    "events": str(TOTAL_EVENTS),
     "nfunds": N_FUNDS,       # funds that were actually ranked somewhere
+    "signals": N_SIGNALS,    # leadership events behind the page
     "concyears": CONC_YEARS, # the two years carrying most of the money gap
-    "gapev": GAP_EVENTS, "gapex": GAP_EXCL,
-    "chart": _split_chart(persist), "ex_cards": EX_CARDS,
+    "gapev": GAP_EVENTS,     # the leader's edge over its category average
+    "ex_cards": EX_CARDS,
 }
 
 INDEX = r"""<!doctype html>
@@ -896,17 +867,7 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
 .sec-eyebrow{font-size:12px;letter-spacing:.16em;font-weight:700;color:var(--faint);
   margin:0 0 12px;text-align:center}
 .sec-eyebrow.teal{color:var(--teal)}
-.framing{font-size:14.5px;color:var(--faint);text-align:center;margin:10px auto 0;max-width:50ch}
-
-.figure{background:var(--raised);border:1px solid var(--line);border-radius:16px;
-  box-shadow:var(--shadow);padding:22px 22px 16px;margin:22px 0 0}
-.figure svg{display:block;width:100%;height:auto;margin:4px 0}
-.cap{font-size:13px;color:var(--muted);line-height:1.5;margin:2px 0 14px}
-.cap.fine{margin:14px 0 0;font-size:12.5px;color:var(--faint)}
-.legend{display:flex;flex-wrap:wrap;gap:6px 20px;justify-content:center;
-  font-size:12.5px;color:var(--muted);margin-top:6px}
-.legend span{display:inline-flex;align-items:center;gap:7px}
-.dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+.framing{font-size:14.5px;color:var(--faint);text-align:center;margin:16px auto 0;max-width:50ch}
 
 .example{background:var(--raised);border:1px solid var(--line);border-radius:16px;
   box-shadow:var(--shadow);padding:22px 24px;margin:22px 0 0}
@@ -958,12 +919,9 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
 <main class="card">
   <div class="kicker">חיסכון ארוך טווח · נתוני רשות שוק ההון</div>
   <h1>מה קרה לקופות שהובילו בתשואה בשנים שלאחר מכן?</h1>
-  <p class="lede">בכל שנה בחרתי את הקופה שהובילה בתשואה בקטגוריה שלה, ובדקתי איפה
-    דורגה בשלוש השנים הבאות. <span class="num">__NFUNDS__</span> קופות גמל והשתלמות
-    הפתוחות לכלל הציבור, בשנים <span class="num">2010-2025</span>. כל קופה מושווית רק
-    מול קופות <b>באותה משפחת מוצר ובאותו מסלול השקעה</b>.</p>
-  <p class="framing">זו בדיקה תיאורית: היא מתארת מה קרה בפועל, ואינה המלצה לפעולה.</p>
-
+  <p class="lede">המחקר כלל <b><span class="num">__NFUNDS__</span> קופות ומסלולי השקעה</b>
+    בשנים <span class="num">2010-2025</span>. בכל שנה נבחרה המובילה בכל קטגוריה,
+    ונבדק הדירוג שלה בשלוש השנים הבאות. ההשוואה נעשתה בין קופות מאותה קטגוריה.</p>
   <div class="divider"></div>
 
   <div class="sec-eyebrow">הממצאים</div>
@@ -974,7 +932,7 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
     </div>
     <div class="stat b">
       <div class="v num">__RANK__</div>
-      <div class="l">הדירוג החציוני של המובילה שנה אחרי, מתוך <span class="num">~__N__</span> קופות</div>
+      <div class="l">הדירוג החציוני של המובילה שנה אחרי</div>
     </div>
     <div class="stat c">
       <div class="v num">__BOT__</div>
@@ -982,18 +940,9 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
     </div>
   </div>
 
-  <div class="figure">
-    <div class="cap">מבין הקופות שעדיין נצפו בקטגוריה, כמה מהמובילות נשארו במחצית
-      העליונה שלה וכמה ירדו לתחתונה, לאחר שנה, שנתיים ושלוש.</div>
-    __CHART__
-    <div class="legend">
-      <span><i class="dot" style="background:var(--teal)"></i> מחצית עליונה של הקטגוריה</span>
-      <span><i class="dot" style="background:var(--clay)"></i> מחצית תחתונה</span>
-    </div>
-    <div class="cap fine">בנוסף, שיעור המובילות שנעלמו מהקטגוריה (נסגרו, מוזגו או חדלו
-      לדווח) עלה מ<span class="num">__VAN1__</span> בשנה הראשונה
-      ל<span class="num">__VAN3__</span> עד השנה השלישית.</div>
-  </div>
+  <p class="framing">שיעור הקופות שלא נצפו באותה קטגוריה עלה
+    מ<span class="num">__VAN1__</span> בשנה הראשונה
+    ל<span class="num">__VAN3__</span> עד השנה השלישית.</p>
 
   <div class="example">
     <div class="sec-eyebrow teal">דוגמאות מוחשיות: קופה אחת לאורך זמן</div>
@@ -1006,34 +955,25 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
   </div>
 
   <section class="summary">
-    <div class="sec-eyebrow teal">מה עולה מהנתונים</div>
-    <p><b>מקום ראשון בשנה אחת אינו מבטיח המשך הובלה.</b> רק מיעוט מהמובילות חזרו
-      לצמרת, רבות צנחו למחצית התחתונה, וחלקן נעלמו מהקטגוריה.</p>
-    <p>היתרון הכספי של הרודף <b>קטן, לא אחיד, ומרוכז בשנים בודדות</b>: בממוצע
-      <span class="num">__MEANGAP__</span> נקודות אחוז לשנה, וברוב הקטגוריות
-      (<span class="num">__NSMALL__</span> מתוך <span class="num">__NCATS__</span>)
-      פחות מנקודה אחת. בלי __CONCYEARS__ הפער הממוצע על פני כל אירועי ההובלה מצטמצם
-      מ-<span class="num">__GAPEV__</span> ל-<span class="num">__GAPEX__</span> נקודות
-      אחוז, וחדל להיות מובהק סטטיסטית.</p>
-    <p>גם בתוך מסלול אחיד המובילה נוטה להיות הקופה התנודתית יותר בקבוצתה, ומאחר
-      שהתקופה התאפיינה בעיקר בעליות בשווקים, <b>ייתכן</b> שחלק מהפער משקף סיכון ולא
-      בהכרח התמדה בביצועים.</p>
-    <p class="fine">הבדיקה תיאורית ואינה מנכה דמי ניהול, מס ועלויות מעבר. ההחלטה כיצד
-      לשקלל את הממצאים נותרת בידי הקורא.</p>
+    <div class="sec-eyebrow teal">המסקנה</div>
+    <p><b>מקום ראשון בשנה אחת לא מבטיח המשך הובלה.</b> רוב המובילות לא נשארו במקום הראשון בשנה שאחרי.</p>
+    <p>בממוצע הן השיגו <span class="num">__GAPEV__</span> נקודות אחוז יותר מממוצע
+      הקטגוריה. אבל רוב הפער נוצר בשנים __CONCYEARS__. בלעדיהן הוא כמעט נעלם.</p>
+    <p class="fine">התשואות הן לפני דמי ניהול. ההשוואה היא לממוצע הקופות באותה קטגוריה.</p>
   </section>
 
   <div class="cta">
     <a class="btn" href="analysis/report.html">
       <span>למחקר המלא, למתודולוגיה ולטבלאות</span><span class="ar">←</span>
     </a>
-    <div class="subnote">טבלאות שנה אחר שנה לכל קטגוריה · ניתוח סיכון · הקוד המלא</div>
+    <div class="subnote">טבלאות שנה אחר שנה לכל קטגוריה · מתודולוגיה · הקוד המלא</div>
   </div>
 
   <div class="src">
     <span><b>מקור:</b> גמל-נט (רשות שוק ההון)</span> ·
     <span><b>תקופה:</b> <span class="num">2010-2025</span></span> ·
-    <span><b>היקף:</b> <span class="num">__NFUNDS__</span> קופות,
-      <span class="num">__EVENTS__</span> אירועי איתות,
+    <span><b>היקף:</b> <span class="num">__NFUNDS__</span> קופות ומסלולים,
+      <span class="num">__SIGNALS__</span> אירועי הובלה,
       <span class="num">__NCAT__</span> קטגוריות</span>
   </div>
   <div class="disclaimer">
@@ -1050,13 +990,10 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
 
 idx_out = INDEX
 for k, v in {"__NO1__":IDX["no1"], "__BOT__":IDX["bot"], "__RANK__":IDX["rank"],
-             "__N__":IDX["n"], "__MEANGAP__":IDX["meangap"],
-             "__NSMALL__":IDX["nsmall"], "__NCATS__":IDX["ncats"],
              "__VAN1__":IDX["van1"], "__VAN3__":IDX["van3"],
-             "__EVENTS__":IDX["events"], "__NCAT__":str(len(CAT_ORDER)),
+             "__SIGNALS__":IDX["signals"], "__NCAT__":str(len(CAT_ORDER)),
              "__NFUNDS__":IDX["nfunds"], "__CONCYEARS__":IDX["concyears"],
-             "__GAPEV__":IDX["gapev"], "__GAPEX__":IDX["gapex"],
-             "__CHART__":IDX["chart"],
+             "__GAPEV__":IDX["gapev"],
              "__EX_CARDS__":IDX["ex_cards"]}.items():
     idx_out = idx_out.replace(k, v)
 open(os.path.join(HERE, os.pardir, "index.html"), "w", encoding="utf-8").write(idx_out)
