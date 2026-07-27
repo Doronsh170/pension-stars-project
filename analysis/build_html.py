@@ -20,7 +20,7 @@ def clean_name(s):
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 def read(n): return list(csv.DictReader(open(os.path.join(HERE, n), encoding="utf-8-sig")))
-events = read("events.csv"); strat = read("strategy_summary.csv"); risk = read("risk_summary.csv")
+events = read("events.csv"); strat = read("strategy_summary.csv")
 rob = {r["test"]: r for r in read("robustness_summary.csv")}
 
 from source import FAMILIES, FAMILY_LABEL, TRACK_ORDER
@@ -77,15 +77,12 @@ persist=[hstats(k) for k in (1,2,3)]
 TOTAL_EVENTS=persist[0]["total"]
 
 strat_by={(s["domain"],s["category"]):s for s in strat}
-risk_by={(r["domain"],r["category"]):r for r in risk}
 strat_data=[{"label":label(c),"dom":d,"fam":family(c),
              "chase":float(strat_by[(d,c)]["chase_annualized_pct"]),
              "stay":float(strat_by[(d,c)]["stay_annualized_pct"]),
              "gap":float(strat_by[(d,c)]["gap_annualized_pp"]),
-             "years":strat_by[(d,c)]["n_years"],
-             "vol":float(risk_by[(d,c)]["winner_vol_pctile"]) if risk_by.get((d,c),{}).get("winner_vol_pctile") else None}
+             "years":strat_by[(d,c)]["n_years"]}
             for d,c in CAT_ORDER if (d,c) in strat_by]
-pooled_vol=risk_by.get(("POOLED",""),{}).get("winner_vol_pctile")
 
 # ---- per-category tracking ----
 ev_by=defaultdict(list)
@@ -163,7 +160,7 @@ NARROW_GAP = f"{_by_track[-1][0]:+.2f}".replace("-", "\u2212")
 NARROW_TRACK = _by_track[-1][1]
 
 DATA=json.dumps({"persist":persist,"strat":strat_data,"cats":cats,
-                 "pooled_vol":pooled_vol,"total":TOTAL_EVENTS,
+                 "total":TOTAL_EVENTS,
                  "track_order":TRACK_ORDER,"wide_track":WIDE_TRACK},ensure_ascii=False)
 
 HTML = r"""<!doctype html>
@@ -393,19 +390,10 @@ tr.closed td{color:var(--faint);font-style:italic}
       <svg id="chartGap" viewBox="0 0 720 430" role="img"
         aria-label="פער התשואה בין רדיפה להישארות לפי קטגוריה"></svg>
     </div>
-    <p class="body"><b>(ב) הקשר לסיכון.</b> כדי לבדוק אם הפער הזה הוא בכלל תשלום על
-      סיכון, מדדתי לכל מובילה את התנודתיות שלה, כלומר כמה התשואה שלה קופצת מעלה ומטה,
-      והשוויתי אותה לשאר הקופות באותה קטגוריה. בסולם אחוזון, שבו 50 היא תנודתיות ממוצעת
-      ואילו 100 היא הקופה התנודתית ביותר בקבוצה, המובילה יושבת בממוצע על
-      <span class="emteal" id="volInline">61</span>. כלומר גם בתוך מסלול אחיד, המובילה
-      נוטה להיות הקופה הנועזת יותר. מכיוון שהתקופה כללה בעיקר שנים של עליות בשווקים,
-      חלק מהפער שבסעיף (א) עשוי לשקף סיכון גדול יותר ולא התמדה של ביצועים.</p>
-    <div class="figure">
-      <div class="cap">אחוזון התנודתיות של המובילה בתוך הקטגוריה
-        (50 = תנודתיות ממוצעת, 100 = התנודתית ביותר בקבוצה).</div>
-      <svg id="chartRisk" viewBox="0 0 720 400" role="img"
-        aria-label="אחוזון התנודתיות של המובילות לפי קטגוריה"></svg>
-    </div>
+    <p class="body"><b>(ב) הקשר לסיכון.</b> גם בתוך מסלול אחיד המובילה נוטה להיות
+      הקופה שהתשואה שלה קופצת יותר מעלה ומטה מרוב הקופות בקטגוריה שלה. מכיוון שהתקופה
+      כללה בעיקר שנים של עליות בשווקים, ייתכן שחלק מהפער שבסעיף (א) הוא תשלום על סיכון
+      ולא התמדה של ביצועים. הפירוט המספרי נמצא ב-<span class="em">risk_summary.csv</span>.</p>
   </section>
 
   <section>
@@ -614,47 +602,6 @@ const trackOf=d=>d.label.split(" · ").slice(1).join(" · ");
   svg.appendChild(txt(120,H-opt.mB+22,"◄ יתרון לרודף",{fill:css("--faint"),"font-size":12,"text-anchor":"middle"}));
   svg.appendChild(txt(x0+95,H-opt.mB+22,"יתרון לנשאר ►",{fill:css("--faint"),"font-size":12,"text-anchor":"middle"}));
 })();
-
-/* ---- risk chart: lollipop around 50, grouped by family ---- */
-(function(){
-  const svg=document.getElementById("chartRisk");
-  const items=D.strat.filter(d=>d.vol!=null);
-  const W=720, opt={mT:14,mB:38,hH:30,rowH:30,gapH:12};
-  const {rows,H}=grouped(items,opt);
-  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
-  const xLab=W-12, xL=56, xR=W-196, base=50;
-  // the axis follows the data: a percentile below 40 used to fall off the panel
-  const vals=items.map(d=>d.vol);
-  const mn=Math.max(0,Math.floor((Math.min(...vals)-6)/10)*10);
-  const mx=Math.min(100,Math.ceil((Math.max(...vals)+6)/10)*10);
-  const x=v=>xL+(xR-xL)*(v-mn)/(mx-mn);
-  const ticks=[]; for(let g=mn;g<=mx;g+=10) ticks.push(g);
-  ticks.forEach(g=>{
-    svg.appendChild(el("line",{x1:x(g),x2:x(g),y1:opt.mT,y2:H-opt.mB,
-      stroke:g===base?css("--base"):css("--line"),"stroke-width":g===base?1.5:1,
-      "stroke-dasharray":g===base?"5 4":""}));
-    svg.appendChild(txt(x(g),H-opt.mB+18,g,{fill:g===base?css("--muted"):css("--faint"),
-      "font-size":11,"text-anchor":"middle","font-weight":g===base?700:400}));
-  });
-  svg.appendChild(txt(x(base),opt.mT-2,"אמצע הקטגוריה",{fill:css("--muted"),"font-size":10.5,"text-anchor":"middle"}));
-  rows.forEach(it=>{
-    if("header" in it){
-      svg.appendChild(txt(xLab,it.y+21,it.header,{fill:css("--ink"),"font-size":15.5,
-        "font-weight":800,"text-anchor":"start"}));
-      return;
-    }
-    const d=it.d, cy=it.y+opt.rowH/2, bold=trackOf(d)===TOP_TRACK;
-    const col=bold?css("--teal"):css("--gold");
-    svg.appendChild(txt(xLab,cy+5,trackOf(d),{fill:css("--ink"),"font-size":14,
-      "font-weight":bold?800:600,"text-anchor":"start"}));
-    svg.appendChild(el("line",{x1:x(base),x2:x(d.vol),y1:cy,y2:cy,stroke:col,"stroke-width":2.5,opacity:.5}));
-    svg.appendChild(el("circle",{cx:x(d.vol),cy:cy,r:6,fill:col}));
-    const right=d.vol>=base;
-    svg.appendChild(txt(x(d.vol)+(right?12:-12),cy+4,Math.round(d.vol),{fill:col,"font-size":12.5,
-      "font-weight":800,"text-anchor":right?"start":"end",style:"direction:ltr"}));
-  });
-})();
-document.getElementById("volInline").textContent=Math.round(D.pooled_vol);
 
 /* ---- tracking tables ---- */
 (function(){
