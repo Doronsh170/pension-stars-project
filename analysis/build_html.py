@@ -21,6 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 def read(n): return list(csv.DictReader(open(os.path.join(HERE, n), encoding="utf-8-sig")))
 events = read("events.csv"); strat = read("strategy_summary.csv"); risk = read("risk_summary.csv")
+rob = {r["test"]: r for r in read("robustness_summary.csv")}
 
 from source import FAMILIES, FAMILY_LABEL, TRACK_ORDER
 _present = {(e["domain"], e["category"]) for e in events}
@@ -110,6 +111,38 @@ N_CATS = str(len(GAPS))
 N_POS = str(sum(1 for g in GAPS if g > 0))          # categories where chasing won
 N_SMALL = str(sum(1 for g in GAPS if abs(g) < 1))   # ...and in how many, barely
 MEAN_GAP = f"{statistics.mean(GAPS):+.2f}".replace("-", "\u2212")
+
+# How wide is the universe the winners were picked out of? Count the funds that
+# were actually ranked: those with at least one complete (12-month) year inside
+# a category-year big enough to have a meaningful "#1".
+def _ranked_universe():
+    from chase_analysis import MIN_FUNDS, FIRST_YEAR, LAST_COMPLETE_YEAR
+    rows = read("annual_returns.csv")
+    by = defaultdict(lambda: defaultdict(set))
+    for r in rows:
+        if int(r["n_months"]) != 12:
+            continue
+        y = int(r["year"])
+        if FIRST_YEAR <= y <= LAST_COMPLETE_YEAR:
+            by[(r["domain"], r["category"])][y].add(r["fund_id"])
+    funds = set()
+    for years in by.values():
+        for f in years.values():
+            if len(f) >= MIN_FUNDS:
+                funds |= f
+    return len(funds)
+
+N_FUNDS = str(_ranked_universe())
+
+# The money gap pooled over every leadership event, and the same gap once the
+# two calendar years that carry most of it are dropped (from robustness.py).
+def _pp(test):
+    return f'{float(rob[test]["estimate"]):+.2f}'.replace("-", "−")
+
+_EXCL = next(t for t in rob if t.startswith("gap_ALL excl "))
+CONC_YEARS = " ו-".join(_EXCL.rsplit(" ", 1)[1].split("_"))
+GAP_EVENTS = _pp("gap_ALL")
+GAP_EXCL = _pp(_EXCL)
 
 def _gap_on_track(track):
     """Mean chase-minus-stay gap on one track, pooled over the families."""
@@ -380,6 +413,11 @@ tr.closed td{color:var(--faint);font-style:italic}
       בקצרה: היתרון של מובילת אשתקד מובהק בשנה הראשונה ובשנייה, אבל
       <b>הוא קטן, לא אחיד בין הקטגוריות, ונעלם עד השנה השלישית</b>. כשמכניסים לחשבון גם
       את הקופות שנסגרו או מוזגו בדרך, גם היתרון של השנים הראשונות נחלש.</p>
+    <p class="body">בדקתי גם עד כמה היתרון נשען על שנים בודדות. הפער הממוצע על פני כל
+      אירועי ההובלה הוא <b>__GAPEV__</b> נקודות אחוז לשנה, אבל שתי שנים
+      (__CONCYEARS__) מספקות את רובו: בלעדיהן הוא יורד ל<b>__GAPEX__</b> נקודות אחוז
+      ואינו מובהק סטטיסטית. כלומר מדובר ביתרון שהתרכז בשנים חריגות, ולא בתוספת קבועה
+      שחוסך יכול לצפות לה בכל שנה.</p>
   </section>
 
   <section>
@@ -662,7 +700,9 @@ open(os.path.join(HERE, "report.html"), "w", encoding="utf-8").write(
         .replace("__MEANGAP__", MEAN_GAP).replace("__NSMALL__", N_SMALL)
         .replace("__NCATS__", N_CATS).replace("__NPOS__", N_POS)
         .replace("__WIDETRACK__", WIDE_TRACK).replace("__WIDEGAP__", WIDE_GAP)
-        .replace("__NARROWTRACK__", NARROW_TRACK).replace("__NARROWGAP__", NARROW_GAP))
+        .replace("__NARROWTRACK__", NARROW_TRACK).replace("__NARROWGAP__", NARROW_GAP)
+        .replace("__CONCYEARS__", CONC_YEARS)
+        .replace("__GAPEV__", GAP_EVENTS).replace("__GAPEX__", GAP_EXCL))
 print("wrote report.html")
 
 # =====================================================================
@@ -794,6 +834,9 @@ IDX = {
     "van1":  f"{round(p1['vanished'])}%",
     "van3":  f"{round(persist[2]['vanished'])}%",
     "events": str(TOTAL_EVENTS),
+    "nfunds": N_FUNDS,       # funds that were actually ranked somewhere
+    "concyears": CONC_YEARS, # the two years carrying most of the money gap
+    "gapev": GAP_EVENTS, "gapex": GAP_EXCL,
     "chart": _split_chart(persist), "ex_cards": EX_CARDS,
 }
 
@@ -905,6 +948,8 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
 .src b{color:var(--muted);font-weight:600}
 .disclaimer{margin:22px auto 0;max-width:60ch;text-align:center;font-size:11.5px;
   color:var(--faint);line-height:1.65}
+.disclaimer-title{margin:0 0 7px;text-align:center;font-size:14px;font-weight:800;color:var(--muted)}
+.disclaimer p{margin:0}
 .credit{margin:9px 0 0;text-align:center;font-size:11.5px;color:var(--faint)}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -913,15 +958,15 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
 <main class="card">
   <div class="kicker">חיסכון ארוך טווח · נתוני רשות שוק ההון</div>
   <h1>מה קרה לקופות שהובילו בתשואה בשנים שלאחר מכן?</h1>
-  <p class="lede">בכל תחילת שנה בחרתי את הקופה שהשיגה את התשואה הגבוהה ביותר בקטגוריה
-    שלה בשנה שחלפה, מתוך מאות קופות גמל והשתלמות הפתוחות לכלל הציבור, ובדקתי איפה
-    דורגה בשלוש השנים הבאות. כל קופה מושווית רק מול קופות
-    <b>באותה משפחת מוצר ובאותו מסלול השקעה</b>.</p>
+  <p class="lede">בכל שנה בחרתי את הקופה שהובילה בתשואה בקטגוריה שלה, ובדקתי איפה
+    דורגה בשלוש השנים הבאות. <span class="num">__NFUNDS__</span> קופות גמל והשתלמות
+    הפתוחות לכלל הציבור, בשנים <span class="num">2010-2025</span>. כל קופה מושווית רק
+    מול קופות <b>באותה משפחת מוצר ובאותו מסלול השקעה</b>.</p>
   <p class="framing">זו בדיקה תיאורית: היא מתארת מה קרה בפועל, ואינה המלצה לפעולה.</p>
 
   <div class="divider"></div>
 
-  <div class="sec-eyebrow">הנתונים</div>
+  <div class="sec-eyebrow">הממצאים</div>
   <div class="stats">
     <div class="stat a">
       <div class="v num">__NO1__</div>
@@ -938,15 +983,16 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
   </div>
 
   <div class="figure">
-    <div class="cap">מבין הקופות ששרדו, כמה מהמובילות נשארו במחצית העליונה של הקטגוריה
-      וכמה ירדו לתחתונה, לאחר שנה, שנתיים ושלוש.</div>
+    <div class="cap">מבין הקופות שעדיין נצפו בקטגוריה, כמה מהמובילות נשארו במחצית
+      העליונה שלה וכמה ירדו לתחתונה, לאחר שנה, שנתיים ושלוש.</div>
     __CHART__
     <div class="legend">
       <span><i class="dot" style="background:var(--teal)"></i> מחצית עליונה של הקטגוריה</span>
       <span><i class="dot" style="background:var(--clay)"></i> מחצית תחתונה</span>
     </div>
-    <div class="cap fine">בנוסף, שיעור הקופות שנסגרו או מוזגו עלה מ<span class="num">__VAN1__</span>
-      בשנה הראשונה ל<span class="num">__VAN3__</span> עד השנה השלישית.</div>
+    <div class="cap fine">בנוסף, שיעור המובילות שנעלמו מהקטגוריה (נסגרו, מוזגו או חדלו
+      לדווח) עלה מ<span class="num">__VAN1__</span> בשנה הראשונה
+      ל<span class="num">__VAN3__</span> עד השנה השלישית.</div>
   </div>
 
   <div class="example">
@@ -960,16 +1006,18 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
   </div>
 
   <section class="summary">
-    <div class="sec-eyebrow teal">מה נראה מהנתונים (בזהירות)</div>
-    <p>מובילות העבר שומרות על מעמדן באופן חלקי וזמני בלבד: רק מיעוט חוזרות לצמרת, ורבות
-      מהן צונחות בהמשך או אף נסגרות.</p>
-    <p>היתרון הכספי של הרודף <b>קטן ולא אחיד</b>: בממוצע
+    <div class="sec-eyebrow teal">מה עולה מהנתונים</div>
+    <p><b>מקום ראשון בשנה אחת אינו מבטיח המשך הובלה.</b> רק מיעוט מהמובילות חזרו
+      לצמרת, רבות צנחו למחצית התחתונה, וחלקן נעלמו מהקטגוריה.</p>
+    <p>היתרון הכספי של הרודף <b>קטן, לא אחיד, ומרוכז בשנים בודדות</b>: בממוצע
       <span class="num">__MEANGAP__</span> נקודות אחוז לשנה, וברוב הקטגוריות
       (<span class="num">__NSMALL__</span> מתוך <span class="num">__NCATS__</span>)
-      פחות מנקודה אחת. גם בתוך מסלול
-      אחיד המובילה נוטה להיות הקופה התנודתית יותר בקבוצתה, ומאחר שהתקופה התאפיינה בעיקר
-      בעליות בשווקים, <b>ייתכן</b> שחלק מהפער משקף סיכון ולא בהכרח התמדה בביצועים.</p>
-    <p>בדקתי את הממצאים גם במבחנים סטטיסטיים. הפירוט המלא במחקר.</p>
+      פחות מנקודה אחת. בלי __CONCYEARS__ הפער הממוצע על פני כל אירועי ההובלה מצטמצם
+      מ-<span class="num">__GAPEV__</span> ל-<span class="num">__GAPEX__</span> נקודות
+      אחוז, וחדל להיות מובהק סטטיסטית.</p>
+    <p>גם בתוך מסלול אחיד המובילה נוטה להיות הקופה התנודתית יותר בקבוצתה, ומאחר
+      שהתקופה התאפיינה בעיקר בעליות בשווקים, <b>ייתכן</b> שחלק מהפער משקף סיכון ולא
+      בהכרח התמדה בביצועים.</p>
     <p class="fine">הבדיקה תיאורית ואינה מנכה דמי ניהול, מס ועלויות מעבר. ההחלטה כיצד
       לשקלל את הממצאים נותרת בידי הקורא.</p>
   </section>
@@ -984,12 +1032,17 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
   <div class="src">
     <span><b>מקור:</b> גמל-נט (רשות שוק ההון)</span> ·
     <span><b>תקופה:</b> <span class="num">2010-2025</span></span> ·
-    <span><b>היקף:</b> <span class="num">__EVENTS__</span> אירועי איתות, <span class="num">__NCAT__</span> קטגוריות</span>
+    <span><b>היקף:</b> <span class="num">__NFUNDS__</span> קופות,
+      <span class="num">__EVENTS__</span> אירועי איתות,
+      <span class="num">__NCAT__</span> קטגוריות</span>
   </div>
-  <p class="disclaimer">גילוי נאות: התוכן נועד למידע כללי ולמטרות לימודיות בלבד, ואינו
+  <div class="disclaimer">
+    <div class="disclaimer-title">גילוי נאות</div>
+    <p>התוכן נועד למידע כללי ולמטרות לימודיות בלבד, ואינו
     מהווה ייעוץ או שיווק פנסיוני או השקעות ואינו תחליף לייעוץ אישי המתחשב בנתוניו ובצרכיו
     של כל אדם. הנתונים מבוססים על מקור פומבי (גמל-נט) וייתכנו בהם אי דיוקים.
     ביצועי עבר אינם מעידים על העתיד.</p>
+  </div>
   <p class="credit">מאת: דורון שרייבמן</p>
 </main>
 </body>
@@ -1001,6 +1054,8 @@ for k, v in {"__NO1__":IDX["no1"], "__BOT__":IDX["bot"], "__RANK__":IDX["rank"],
              "__NSMALL__":IDX["nsmall"], "__NCATS__":IDX["ncats"],
              "__VAN1__":IDX["van1"], "__VAN3__":IDX["van3"],
              "__EVENTS__":IDX["events"], "__NCAT__":str(len(CAT_ORDER)),
+             "__NFUNDS__":IDX["nfunds"], "__CONCYEARS__":IDX["concyears"],
+             "__GAPEV__":IDX["gapev"], "__GAPEX__":IDX["gapex"],
              "__CHART__":IDX["chart"],
              "__EX_CARDS__":IDX["ex_cards"]}.items():
     idx_out = idx_out.replace(k, v)
