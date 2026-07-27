@@ -347,7 +347,7 @@ tr.closed td{color:var(--faint);font-style:italic}
     שחלפה, ובדקתי איך הסתדרה בשלוש השנים הבאות. ההשוואה היא תמיד מול קופות באותה
     משפחת מוצר ובאותו מסלול השקעה, ולא מול כל השוק.</p>
   <div class="sourceline">
-    <span><b>מקור:</b> גמל-נט (רשות שוק ההון)</span>
+    <span><b>מקור:</b> רשות שוק ההון</span>
     <span><b>תקופה:</b> שנות איתות <span class="num">2010-2024</span> · מעקב עד <span class="num">2025</span></span>
     <span><b>היקף:</b> <span class="num" id="catCount">21</span> קטגוריות · <span class="num" id="evCount">70</span> אירועי איתות</span>
   </div>
@@ -416,7 +416,7 @@ tr.closed td{color:var(--faint);font-style:italic}
     <div class="disclosure-title">גילוי נאות</div>
     <p>התוכן נועד למידע כללי ולמטרות לימודיות בלבד, ואינו מהווה ייעוץ
     או שיווק פנסיוני או השקעות ואינו תחליף לייעוץ אישי המתחשב בנתוניו ובצרכיו של כל אדם.
-    הנתונים מבוססים על מקורות פומביים (גמל-נט) וייתכנו בהם אי דיוקים.
+    הנתונים מבוססים על מקורות פומביים (רשות שוק ההון) וייתכנו בהם אי דיוקים.
     ביצועי עבר אינם מעידים על העתיד.</p>
     <div class="credit">מאת: דורון שרייבמן</div>
   </div>
@@ -861,7 +861,7 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
 <main class="card">
   <div class="kicker">חיסכון ארוך טווח · נתוני רשות שוק ההון</div>
   <h1>מה קרה לקופות שהובילו בתשואה בשנים שלאחר מכן?</h1>
-  <p class="lede">המחקר כלל <b><span class="num">__NFUNDS__</span> קופות ומסלולי השקעה</b>
+  <p class="lede">המחקר כלל <b><span class="num">__NFUNDS__</span> קופות במגוון רחב של מסלולי השקעה</b>
     בשנים <span class="num">2010-2025</span>. בכל שנה נבחרה המובילה בכל קטגוריה,
     ונבדק הדירוג שלה בשלוש השנים הבאות. ההשוואה נעשתה בין קופות מאותה קטגוריה.</p>
   <div class="divider"></div>
@@ -916,7 +916,7 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
   </div>
 
   <div class="src">
-    <span><b>מקור:</b> גמל-נט (רשות שוק ההון)</span> ·
+    <span><b>מקור:</b> רשות שוק ההון</span> ·
     <span><b>תקופה:</b> <span class="num">2010-2025</span></span> ·
     <span><b>היקף:</b> <span class="num">__NFUNDS__</span> קופות ומסלולים,
       <span class="num">__SIGNALS__</span> אירועי הובלה,
@@ -926,7 +926,7 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
     <div class="disclaimer-title">גילוי נאות</div>
     <p>התוכן נועד למידע כללי ולמטרות לימודיות בלבד, ואינו
     מהווה ייעוץ או שיווק פנסיוני או השקעות ואינו תחליף לייעוץ אישי המתחשב בנתוניו ובצרכיו
-    של כל אדם. הנתונים מבוססים על מקור פומבי (גמל-נט) וייתכנו בהם אי דיוקים.
+    של כל אדם. הנתונים מבוססים על מקור פומבי (רשות שוק ההון) וייתכנו בהם אי דיוקים.
     ביצועי עבר אינם מעידים על העתיד.</p>
   </div>
   <p class="credit">מאת: דורון שרייבמן</p>
