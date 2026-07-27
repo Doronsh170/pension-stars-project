@@ -341,10 +341,9 @@ tr.closed td{color:var(--faint);font-style:italic}
 
 <div class="wrap">
   <div class="tldr">
-    <div class="lab">שלוש השאלות</div>
+    <div class="lab">שתי השאלות</div>
     <p><span class="qn num">1</span> האם קופות שהובילו שומרות על מעמדן בהמשך?
-      <span class="qn num">2</span> מהו הדירוג האופייני של מובילה לאחר שנה, שנתיים ושלוש?
-      <span class="qn num">3</span> האם נמצא יתרון עקבי למעבר אל מובילת אשתקד?</p>
+      <span class="qn num">2</span> מהו הדירוג החציוני של מובילה לאחר שנה, שנתיים ושלוש?</p>
     <p class="tldr-note">המטרה אינה להוכיח או להפריך מראש את כדאיות המעבר, אלא להציג
       את הנתונים ההיסטוריים ולאפשר להסיק מהם מסקנות מבוססות עובדות.</p>
   </div>
@@ -369,9 +368,9 @@ tr.closed td{color:var(--faint);font-style:italic}
   </section>
 
   <section>
-    <div class="eyebrow">שאלה 02 · דירוג אופייני</div>
-    <h2>מהו הדירוג האופייני לאחר 1, 2, 3 שנים?</h2>
-    <p class="body">מבין הקופות ששרדו, הדירוג האופייני (החציוני) של מובילת אשתקד בשנה
+    <div class="eyebrow">שאלה 02 · דירוג חציוני</div>
+    <h2>מהו הדירוג החציוני לאחר 1, 2, 3 שנים?</h2>
+    <p class="body">מבין הקופות ששרדו, הדירוג החציוני של מובילת אשתקד בשנה
       שאחרי הוא <span class="emteal" id="s_medrank">מקום 10 מתוך 36</span>, סביב
       השליש העליון של הקטגוריה, לא סמוך למקום הראשון. האחוזון הממוצע גבוה מאמצע
       הקטגוריה, אך מתקרב אליו ככל שחולף הזמן.</p>
@@ -389,48 +388,7 @@ tr.closed td{color:var(--faint);font-style:italic}
     <div class="stats" id="statsRank"></div>
   </section>
 
-  <section>
-    <div class="eyebrow">שאלה 03 · יתרון עקבי</div>
-    <h2>האם נמצא יתרון עקבי?</h2>
-    <p class="body"><b>(א) התוצאה הכספית.</b> השוויתי שתי התנהגויות: חוסך
-      ש<span class="emteal">רודף</span>, כלומר עובר בכל שנה למובילת אשתקד, מול חוסך
-      ש<span class="emteal">נשאר</span> בממוצע הקטגוריה. הפער לטובת הרודף קטן ולא אחיד:
-      בממוצע <span class="num">__MEANGAP__</span> נקודות אחוז לשנה, וברוב הקטגוריות
-      (<span class="num">__NSMALL__</span> מתוך <span class="num">__NCATS__</span>)
-      הוא קטן מנקודה אחת לשנה. הוא הגדול
-      ביותר במסלול <span class="em">__WIDETRACK__</span>
-      (<span class="num">__WIDEGAP__</span> נק') והקטן ביותר במסלול
-      <span class="em">__NARROWTRACK__</span> (<span class="num">__NARROWGAP__</span> נק').</p>
-    <p class="body">אותו פער נמדד כאן בשני חתכים. בממוצע פשוט על פני כל אירועי ההובלה,
-      המובילה היכתה את ממוצע הקטגוריה שלה ב-<span class="num">__GAPEV__</span> נקודות
-      אחוז בשנה שאחרי — זה המספר שבעמוד התקציר. החישוב המצטבר שלמעלה נמוך ממנו, משום
-      שהוא מלווה את החוסך לאורך שנים, מחזיר אותו לממוצע הקטגוריה בכל שנה שבה המובילה
-      נסגרה, ומשקלל כל קטגוריה במשקל שווה.</p>
-    <div class="figure">
-      <div class="cap">פער התשואה השנתית (CAGR) בין "רודף" ל"נשאר", לפי קטגוריה. עמודה
-        זהובה (שמאלה) = יתרון לרודף; עמודה חמרה (ימינה) = יתרון לנשאר. בנקודות אחוז.</div>
-      <svg id="chartGap" viewBox="0 0 720 430" role="img"
-        aria-label="פער התשואה בין רדיפה להישארות לפי קטגוריה"></svg>
-    </div>
-    <p class="body"><b>(ב) הקשר לסיכון.</b> גם בתוך מסלול אחיד המובילה נוטה להיות
-      הקופה שהתשואה שלה קופצת יותר מעלה ומטה מרוב הקופות בקטגוריה שלה. מכיוון שהתקופה
-      כללה בעיקר שנים של עליות בשווקים, ייתכן שחלק מהפער שבסעיף (א) הוא תשלום על סיכון
-      ולא התמדה של ביצועים.</p>
-  </section>
 
-  <section>
-    <div class="eyebrow">אמינות</div>
-    <h2>עד כמה הממצא מוצק?</h2>
-    <p class="body">בדקתי במבחנים סטטיסטיים אם התוצאות אמיתיות או סתם מזל אקראי.
-      בקצרה: היתרון של מובילת אשתקד מובהק בשנה הראשונה ובשנייה, אבל
-      <b>הוא קטן, לא אחיד בין הקטגוריות, ונעלם עד השנה השלישית</b>. כשמכניסים לחשבון גם
-      את הקופות שנסגרו או מוזגו בדרך, גם היתרון של השנים הראשונות נחלש.</p>
-    <p class="body">בדקתי גם עד כמה היתרון נשען על שנים בודדות. הפער הממוצע על פני כל
-      אירועי ההובלה הוא <b>__GAPEV__</b> נקודות אחוז לשנה, אבל שתי שנים
-      (__CONCYEARS__) מספקות את רובו: בלעדיהן הוא יורד ל<b>__GAPEX__</b> נקודות אחוז
-      ואינו מובהק סטטיסטית. כלומר מדובר ביתרון שהתרכז בשנים חריגות, ולא בתוספת קבועה
-      שחוסך יכול לצפות לה בכל שנה.</p>
-  </section>
 
   <section>
     <div class="eyebrow">הנתונים המלאים</div>
@@ -439,41 +397,6 @@ tr.closed td{color:var(--faint);font-style:italic}
       מספר הקופות בקטגוריה) בכל אחת משלוש השנים שאחרי.</p>
     <div id="tables"></div>
   </section>
-
-  <div class="conc">
-    <h2>תמצית הממצאים</h2>
-    <p class="body">הנתונים ההיסטוריים מצביעים על התמונה הבאה, המוצגת כעובדות:</p>
-    <div class="stats">
-      <div class="stat a">
-        <div class="v num" id="c_no1">15%</div>
-        <div class="l">מהמובילות חזרו למקום הראשון בשנה שאחרי</div>
-      </div>
-      <div class="stat b">
-        <div class="v num" id="c_rank">6</div>
-        <div class="l">הדירוג החציוני שנה אחרי, מתוך כ-<span class="num" id="c_n">16</span>
-          קופות בקטגוריה</div>
-      </div>
-      <div class="stat c">
-        <div class="v num" id="c_bot">43%</div>
-        <div class="l">ירדו למחצית התחתונה כבר אחרי שנה</div>
-      </div>
-      <div class="stat c">
-        <div class="v num" id="c_van3">18%</div>
-        <div class="l">נעלמו מהקטגוריה בתוך שלוש שנים</div>
-      </div>
-      <div class="stat a">
-        <div class="v num">__MEANGAP__</div>
-        <div class="l">נקודות אחוז לשנה — היתרון המצטבר של הרודף</div>
-      </div>
-      <div class="stat b">
-        <div class="v num">__NSMALL__/__NCATS__</div>
-        <div class="l">הקטגוריות שבהן היתרון קטן מנקודת אחוז אחת</div>
-      </div>
-    </div>
-    <p class="body">היתרון הגדול ביותר נמצא במסלול <span class="em">__WIDETRACK__</span>,
-      וגם בתוך מסלול אחיד המובילה נוטה להיות הקופה התנודתית יותר, בתקופה של שווקים
-      עולים.</p>
-  </div>
 
   <div class="foot disclosure">
     <div class="disclosure-title">גילוי נאות</div>
@@ -613,6 +536,7 @@ const trackOf=d=>d.label.split(" · ").slice(1).join(" · ");
 /* ---- gap chart: diverging bars, grouped by family, track labels on right ---- */
 (function(){
   const svg=document.getElementById("chartGap");
+  if(!svg) return;
   const items=D.strat;
   const W=720, opt={mT:12,mB:40,hH:30,rowH:30,gapH:12};
   const {rows,H}=grouped(items,opt);
@@ -946,8 +870,12 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
   <section class="summary">
     <div class="sec-eyebrow teal">המסקנה</div>
     <p><b>מקום ראשון בשנה אחת לא מבטיח המשך הובלה.</b> רוב המובילות לא נשארו במקום הראשון בשנה שאחרי.</p>
-    <p>בממוצע הן השיגו <span class="num">__GAPEV__</span> נקודות אחוז יותר מממוצע
-      הקטגוריה. אבל רוב הפער נוצר בשנים __CONCYEARS__. בלעדיהן הוא כמעט נעלם.</p>
+    <p>בממוצע, בשנה שלאחר ההובלה הן השיגו תשואה גבוהה ב-<span class="num">__GAPEV_SIMPLE__%</span>
+      מממוצע הקופות באותה קטגוריה. אבל רוב היתרון נוצר בשנים __CONCYEARS__.
+      כשמוציאים שנים אלו מהחישוב, כמעט שלא נשאר פער.</p>
+    <p>ב-2020 כמה ממובילות 2019, בעיקר מסלולי מור, המשיכו להוביל בפער גדול בכמה סוגי חיסכון.
+      ב-2025 שלושה מסלולים גמישים השיגו כ-46%-48%, לעומת כ-14% בממוצע הקטגוריה.
+      מספר קטן של פערים חריגים כאלה משך למעלה את ממוצע התקופה כולה.</p>
     <p class="fine">התשואות הן לפני דמי ניהול. ההשוואה היא לממוצע הקופות באותה קטגוריה.</p>
   </section>
 
@@ -983,6 +911,7 @@ for k, v in {"__NO1__":IDX["no1"], "__BOT__":IDX["bot"], "__RANK__":IDX["rank"],
              "__SIGNALS__":IDX["signals"], "__NCAT__":str(len(CAT_ORDER)),
              "__NFUNDS__":IDX["nfunds"], "__CONCYEARS__":IDX["concyears"],
              "__GAPEV__":IDX["gapev"],
+             "__GAPEV_SIMPLE__":IDX["gapev"].lstrip("+"),
              "__EX_CARDS__":IDX["ex_cards"]}.items():
     idx_out = idx_out.replace(k, v)
 open(os.path.join(HERE, os.pardir, "index.html"), "w", encoding="utf-8").write(idx_out)

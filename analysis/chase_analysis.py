@@ -17,6 +17,7 @@ Inputs : analysis/annual_returns.csv  (from build_annual.py)
 Outputs: analysis/events.csv          (one row per signal-year winner + follow-ups)
          analysis/category_summary.csv (per-category aggregates)
          analysis/strategy_summary.csv (chase vs stay money outcome)
+         analysis/annual_gap_events.csv (one chase-vs-stay gap per follow-up year)
          console report
 """
 import csv, os, statistics
@@ -100,6 +101,7 @@ def main():
 
     cat_rows = []
     strat_rows = []
+    annual_gap_rows = []
 
     for domain in ("gemel",):
         for cat in CATEGORIES[domain]:
@@ -158,7 +160,9 @@ def main():
             # Chase: each year Y (from 2nd valid year on) hold last year's winner,
             # earn its return this year. Stay: hold the equal-weight category average.
             chase_mult, stay_mult, best_mult = 1.0, 1.0, 1.0
+            chase_mult_ex, stay_mult_ex = 1.0, 1.0
             sim_years = []
+            sim_years_ex = []
             all_years = sorted(y for y in years if len(years[y]) >= MIN_FUNDS)
             for i in range(1, len(all_years)):
                 prevY = all_years[i - 1]
@@ -167,21 +171,40 @@ def main():
                     # only chain consecutive years
                     continue
                 s_prev, _ = ranked(years[prevY])
-                win_fid = s_prev[0][0]
+                win_fid, win_name, _ = s_prev[0]
                 _, info = ranked(years[Y])
                 this_year = years[Y]
                 avg_ret = statistics.mean([r for _, _, r in this_year])
                 best_ret = max(r for _, _, r in this_year)
-                if win_fid in info:
+                vanished = win_fid not in info
+                if not vanished:
                     chase_ret = info[win_fid][1]
                 else:
                     chase_ret = avg_ret   # if winner vanished, fall back to average
+                annual_gap_rows.append({
+                    "domain": domain, "category": cat,
+                    "signal_year": prevY, "follow_year": Y,
+                    "winner_fund_id": win_fid, "winner_name": win_name,
+                    "chase_return_pct": chase_ret,
+                    "category_average_return_pct": avg_ret,
+                    "gap_pp": chase_ret - avg_ret,
+                    "winner_vanished": int(vanished),
+                })
                 chase_mult *= (1 + chase_ret / 100)
                 stay_mult *= (1 + avg_ret / 100)
                 best_mult *= (1 + best_ret / 100)
                 sim_years.append(Y)
+                if Y not in (2020, 2025):
+                    chase_mult_ex *= (1 + chase_ret / 100)
+                    stay_mult_ex *= (1 + avg_ret / 100)
+                    sim_years_ex.append(Y)
             if sim_years:
                 nY = len(sim_years)
+                nY_ex = len(sim_years_ex)
+                gap_ex = (
+                    ((chase_mult_ex ** (1 / nY_ex)) - (stay_mult_ex ** (1 / nY_ex))) * 100
+                    if nY_ex else None
+                )
                 strat_rows.append({
                     "domain": domain, "category": cat,
                     "years": f"{sim_years[0]}-{sim_years[-1]}", "n_years": nY,
@@ -190,6 +213,7 @@ def main():
                     "chase_annualized_pct": round((chase_mult ** (1 / nY) - 1) * 100, 2),
                     "stay_annualized_pct": round((stay_mult ** (1 / nY) - 1) * 100, 2),
                     "gap_annualized_pp": round(((chase_mult ** (1 / nY)) - (stay_mult ** (1 / nY))) * 100, 2),
+                    "gap_annualized_ex_pp": round(gap_ex, 2) if gap_ex is not None else "",
                 })
 
             def m(lst):
@@ -223,6 +247,13 @@ def main():
         w = csv.DictWriter(f, fieldnames=list(strat_rows[0].keys()))
         w.writeheader(); w.writerows(strat_rows)
 
+    gap_fields = ["domain", "category", "signal_year", "follow_year",
+                  "winner_fund_id", "winner_name", "chase_return_pct",
+                  "category_average_return_pct", "gap_pp", "winner_vanished"]
+    with open(os.path.join(HERE, "annual_gap_events.csv"), "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.DictWriter(f, fieldnames=gap_fields)
+        w.writeheader(); w.writerows(annual_gap_rows)
+
     # ---- console report ----
     print("=" * 70)
     print("POOLED PERSISTENCE OF LAST YEAR'S #1 FUND  (all categories, all years)")
@@ -243,7 +274,7 @@ def main():
     print("\n" + "=" * 70)
     print("MONEY OUTCOME: chase last year's #1  vs  hold category average")
     print("=" * 70)
-    print(f"{'category':45s} {'yrs':>4} {'chaseCAGR':>9} {'stayCAGR':>8} {'gap(pp)':>7}")
+    print(f"{'category':45s} {'yrs':>4} {'chase_ann':>9} {'stay_ann':>8} {'gap(pp)':>7}")
     for s in strat_rows:
         print(f"{(s['domain'][:3]+' '+s['category'])[:45]:45s} {s['n_years']:>4} "
               f"{s['chase_annualized_pct']:>9} {s['stay_annualized_pct']:>8} {s['gap_annualized_pp']:>7}")
@@ -251,7 +282,11 @@ def main():
     gaps = [s["gap_annualized_pp"] for s in strat_rows]
     print(f"\nAverage annualized gap (chase - stay) across categories: {statistics.mean(gaps):+.2f} pp")
     print(f"Categories where chasing WON: {sum(1 for g in gaps if g>0)}/{len(gaps)}")
-    print("\nwrote events.csv, category_summary.csv, strategy_summary.csv")
+    gaps_ex = [float(s["gap_annualized_ex_pp"]) for s in strat_rows if s["gap_annualized_ex_pp"] != ""]
+    print(f"Excluding follow-up years 2020 and 2025: mean {statistics.mean(gaps_ex):+.2f} pp, "
+          f"median {statistics.median(gaps_ex):+.2f} pp, "
+          f"chasing won {sum(1 for g in gaps_ex if g > 0)}/{len(gaps_ex)}")
+    print("\nwrote events.csv, category_summary.csv, strategy_summary.csv, annual_gap_events.csv")
 
 
 if __name__ == "__main__":
