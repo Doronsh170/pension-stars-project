@@ -22,7 +22,7 @@ Outputs: analysis/events.csv          (one row per signal-year winner + follow-u
 import csv, os, statistics
 from collections import defaultdict
 
-from source import FAMILIES, RISK_ORDER
+from source import TRACKS
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 IN = os.path.join(HERE, "annual_returns.csv")
@@ -33,15 +33,12 @@ HORIZONS = (1, 2, 3)
 FIRST_YEAR = 2010           # study focuses on signal years from 2010 onward
 LAST_COMPLETE_YEAR = 2025   # 2026 is only a partial year in the raw data
 
-# The comparison group is the fund family a saver picks (study fund, provident,
-# investment provident, child savings) crossed with the fund's risk level. Two
-# funds only compete for the same money if they sit in the same cell, so the
-# ranking never rewards a fund merely for carrying more equity than its rivals.
+# The comparison group is the fund's מסלול ממופה track. Two funds only compete
+# for the same money if they hold roughly the same thing, so the ranking never
+# rewards a fund merely for carrying more equity than its rivals.
 
-# category string = "<family> | <risk level>", matching build_annual.py.
-CATEGORIES = {
-    "gemel": [f"{fam} | {risk}" for fam in FAMILIES for risk in RISK_ORDER],
-}
+# category string = the track, matching build_annual.py.
+CATEGORIES = {"gemel": list(TRACKS)}
 
 
 def load():

@@ -22,18 +22,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 def read(n): return list(csv.DictReader(open(os.path.join(HERE, n), encoding="utf-8-sig")))
 events = read("events.csv"); strat = read("strategy_summary.csv"); risk = read("risk_summary.csv")
 
-from source import FAMILIES, FAMILY_LABEL, RISK_ORDER
+from source import TRACKS
 _present = {(e["domain"], e["category"]) for e in events}
-CAT_ORDER = [
-    ("gemel", f"{fam} | {risk}")
-    for fam in FAMILIES for risk in RISK_ORDER
-    if ("gemel", f"{fam} | {risk}") in _present
-]
+# Tracks actually present in the results, ordered least to most equity.
+CAT_ORDER = [("gemel", t) for t in TRACKS if ("gemel", t) in _present]
 def family(c):
-    head = c.split(" | ")[0]
-    return FAMILY_LABEL.get(head, head)
+    """The category is the track itself."""
+    return c
 def label(c):
-    return family(c) + " · " + c.split(" | ")[1]
+    return c
 
 # ---- horizon statistics (descriptive) ----
 def hstats(k):
@@ -106,23 +103,21 @@ for d,c in CAT_ORDER:
 
 DATA=json.dumps({"persist":persist,"strat":strat_data,"cats":cats,
                  "pooled_vol":pooled_vol,"total":TOTAL_EVENTS,
-                 "risk_order":RISK_ORDER},ensure_ascii=False)
+                 "risk_order":[t for _,t in CAT_ORDER]},ensure_ascii=False)
 
-def _gap_at_risk(level):
-    """Mean chase-minus-stay gap at one risk level, pooled over the families."""
-    vals = [float(s["gap_annualized_pp"]) for s in strat
-            if s["category"].split(" | ")[1] == level]
-    if not vals:
-        return "—"
-    return f"{statistics.mean(vals):+.2f}".replace("-", "\u2212")
-# The headline contrast is the solid end of the risk scale against the bold end:
-# that is where the chase gap goes from ~nothing to its largest values.
-LOW_RISK, HIGH_RISK = RISK_ORDER[0], RISK_ORDER[-1]
-SOLID_GAP = _gap_at_risk(LOW_RISK)
-BOLD_GAP = _gap_at_risk(HIGH_RISK)
-N_SOLID = sum(1 for s in strat
-              if s["category"].split(" | ")[1] in RISK_ORDER[:2]
-              and float(s["gap_annualized_pp"]) <= 1)
+_gap = {s["category"]: float(s["gap_annualized_pp"]) for s in strat}
+def _fmt_gap(track):
+    if track not in _gap:
+        return "\u2014"
+    return f"{_gap[track]:+.2f}".replace("-", "\u2212")
+# The headline contrast is the solid end of the track scale against the bold
+# end: that is where the chase gap goes from ~nothing to its largest values.
+_live = [t for _, t in CAT_ORDER if t in _gap]
+LOW_RISK = min(_live, key=lambda t: _gap[t])
+HIGH_RISK = max(_live, key=lambda t: _gap[t])
+SOLID_GAP = _fmt_gap(LOW_RISK)
+BOLD_GAP = _fmt_gap(HIGH_RISK)
+N_SOLID = sum(1 for t in _live if _gap[t] <= 1)
 
 HTML = r"""<!doctype html>
 <html lang="he" dir="rtl">
@@ -354,9 +349,9 @@ tr.closed td{color:var(--faint);font-style:italic}
       <span class="num">50</span> = תנודתיות ממוצעת לקטגוריה, <span class="num">100</span> =
       הקופה התנודתית (המסוכנת) ביותר בקבוצה. המובילה יושבת בממוצע באחוזון
       <span class="emteal" id="volInline">67</span> — כלומר נוטה להיות מהתנודתיות יותר
-      בקבוצתה, גם אחרי שהשווינו רק קופות באותה רמת סיכון. רמת סיכון היא סרגל גס:
-      בתוך רמה אחת עדיין נכנסות קופות בעלות אופי שונה, והמובילה נוטה להיות זו שבקצה
-      הנועז של הרמה. מאחר שהתקופה כללה בעיקר שנים של עליות, אותן קופות השיגו בממוצע
+      בקבוצתה, גם אחרי שהשווינו רק קופות באותו מסלול. מסלול הוא סרגל גס: בתוך מסלול
+      אחד עדיין נכנסות קופות בעלות אופי שונה, והמובילה נוטה להיות זו שבקצה הנועז שלו.
+      מאחר שהתקופה כללה בעיקר שנים של עליות, אותן קופות השיגו בממוצע
       תשואות גבוהות יותר — כך שחלק מהפער שבסעיף (א) משקף סיכון, ולא בהכרח התמדה של ביצועים.</p>
     <div class="figure">
       <div class="cap">אחוזון התנודתיות (סטיית התקן) של המובילה בתוך הקטגוריה
@@ -395,9 +390,9 @@ tr.closed td{color:var(--faint);font-style:italic}
         בשנה שאחרי סביב השליש העליון, והאחוזון הממוצע מתכנס אל עבר האמצע עם הזמן.</li>
       <li><b>היתרון הכספי אינו אחיד — הוא עולה עם רמת הסיכון.</b> ברמה
         <span class="em">__LOWRISK__</span> הפער כמעט נעלם
-        (<span class="num">__SOLIDGAP__</span> נק' לשנה), וברמה
+        (<span class="num">__SOLIDGAP__</span> נק' לשנה), ובמסלול
         <span class="em">__HIGHRISK__</span> הוא מגיע לכ־<span class="num">__BOLDGAP__</span>
-        נק'. גם בתוך רמת סיכון נתונה המובילה נוטה להיות הקופה התנודתית יותר,
+        נק'. גם בתוך מסלול נתון המובילה נוטה להיות הקופה התנודתית יותר,
         בתקופה של שווקים עולים.</li>
     </ol>
     <p class="body">הנתונים המלאים והקוד בתיקיית <code>analysis/</code>. לקורא/ת נותרת
@@ -405,7 +400,7 @@ tr.closed td{color:var(--faint);font-style:italic}
   </div>
 
   <div class="foot">
-    שחזור: <code>build_risk_levels.py</code> → <code>build_annual.py</code> → <code>chase_analysis.py</code> →
+    שחזור: <code>build_track_map.py</code> → <code>build_annual.py</code> → <code>chase_analysis.py</code> →
     <code>risk_check.py</code> → <code>robustness.py</code> → <code>make_report.py</code> / <code>build_html.py</code>.
     נכללות רק קופות הפתוחות לכלל הציבור; קופות סקטוריאליות, מגזריות וסגורות (וכן עוטפי
     IRA וקופות דמי מחלה) הוצאו מהמדגם. תשואה שנתית חושבה משרשור התשואות החודשיות; נכללו
@@ -897,7 +892,7 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
   <p class="lede">בכל תחילת שנה זיהינו את הקופה שהשיגה את התשואה הגבוהה ביותר בקטגוריה
     שלה בשנה שחלפה, מבין מאות קופות גמל והשתלמות הפתוחות לכלל הציבור, ועקבנו
     אחר הדירוג והתשואה שלה בשלוש השנים הבאות. כל קופה מושווית רק מול קופות
-    <b>באותה משפחת מוצר ובאותה רמת סיכון</b>.</p>
+    <b>באותו מסלול השקעה</b>.</p>
   <p class="framing">בדיקה תיאורית: היא מתארת מה קרה בפועל, ואינה המלצה לפעולה.</p>
 
   <div class="divider"></div>
@@ -944,10 +939,10 @@ h1{font-size:clamp(28px,5.6vw,42px);line-height:1.15;font-weight:800;letter-spac
     <div class="sec-eyebrow teal">מה נראה מהנתונים (בזהירות)</div>
     <p>מובילות העבר שומרות על מעמדן באופן חלקי וזמני בלבד: רק מיעוט חוזרות לצמרת, ורבות
       מהן צונחות בהמשך או אף נסגרות.</p>
-    <p>היתרון הכספי <b>אינו אחיד — הוא עולה עם רמת הסיכון</b>. ברמת הסיכון
+    <p>היתרון הכספי <b>אינו אחיד בין המסלולים</b>. במסלול
       <b>__LOWRISK__</b> הפער בין "רודף" ל"נשאר" כמעט נעלם
-      (<span class="num">__SOLIDGAP__</span> נק' לשנה), וברמת הסיכון <b>__HIGHRISK__</b>
-      הוא מגיע לכ־<span class="num">__BOLDGAP__</span> נק'. גם בתוך רמת סיכון נתונה,
+      (<span class="num">__SOLIDGAP__</span> נק' לשנה), ובמסלול <b>__HIGHRISK__</b>
+      הוא מגיע לכ־<span class="num">__BOLDGAP__</span> נק'. גם בתוך מסלול נתון,
       המובילה נוטה להיות הקופה התנודתית יותר בקבוצתה — ומאחר שהתקופה התאפיינה בעיקר
       בעליות בשווקים, <b>ייתכן</b> שחלק מהפער משקף סיכון ולא בהכרח התמדה בביצועים.</p>
     <p>בדקנו את הממצאים גם במבחנים סטטיסטיים, והמסקנות מחזיקות. הפירוט המלא במחקר.</p>

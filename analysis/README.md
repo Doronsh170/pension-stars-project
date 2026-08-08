@@ -68,6 +68,7 @@
 
 ```bash
 pip install openpyxl                   # התלות היחידה
+python3 analysis/build_track_map.py    # -> fund_track_map.csv + track-map-review.xlsx
 python3 analysis/build_risk_levels.py  # -> fund_risk_levels.csv
 python3 analysis/build_annual.py       # -> annual_returns.csv
 python3 analysis/chase_analysis.py     # -> events.csv, category_summary.csv, strategy_summary.csv
@@ -81,6 +82,8 @@ python3 analysis/build_html.py         # -> analysis/report.html (מלא) + inde
 
 | קובץ | תוכן |
 |---|---|
+| `fund_track_map.csv` | **המסלול הממופה** לכל קופה + הכלל שקבע אותו + התמהיל שנמדד |
+| `../track-map-review.xlsx` | אותה טבלה כחוברת עבודה לבדיקה ידנית, כשהשורות הפחות בטוחות למעלה |
 | `fund_risk_levels.csv` | רמת סיכון לכל קופה + מקור השיוך (מיפוי / מסלול / חשיפה / תנודתיות) |
 | `annual_returns.csv` | תשואה שנתית לכל קופה × שנה |
 | `events.csv` | לכל מנצחת: הדירוג והתשואה ב-3 השנים שאחרי |

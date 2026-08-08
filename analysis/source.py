@@ -24,10 +24,27 @@ ROOT = os.path.dirname(HERE)
 DATA_XLSX = os.path.join(ROOT, "gemel-2010-2025.xlsx")
 RISKMAP_XLSX = os.path.join(ROOT, "fund-risk-map.xlsx")
 
-# Risk levels, least to most risky. This is the study's comparison dimension:
-# funds are ranked against other funds of the same risk level, not against the
-# whole market, so a "winner" is never just the fund that took more equity.
+# Risk levels, least to most risky. Carried per fund for the risk-control
+# stage; it is no longer the dimension funds are grouped on.
 RISK_ORDER = ["נמוך מאוד", "נמוך", "נמוך-בינוני", "בינוני", "גבוה"]
+
+# The מסלול ממופה tracks, ordered by how much equity they hold. This is the
+# study's comparison dimension: a fund is only ever ranked against funds that
+# hold roughly the same thing, so a "winner" is never just the fund that took
+# more equity than its rivals. Built by build_track_map.py.
+# `הלכתי` and `מבטיח תשואה` sit outside the ordering - they are product
+# constraints rather than points on the equity scale.
+TRACKS = [
+    "כספי ושקלי קצר",
+    "אג\"ח ממשלתי",
+    "אג\"ח ללא מניות",
+    "אג\"ח עם עד 25% מניות",
+    "כללי",
+    "מניות אקטיבי",
+    "מניות מחקות מדד",
+    "הלכתי",
+    "מבטיח תשואה",
+]
 
 # Fund families a saver actively chooses between. `מרכזית לפיצויים` (an employer
 # severance reserve) and `מטרה אחרת` are excluded: the saver does not pick them.

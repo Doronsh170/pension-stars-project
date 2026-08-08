@@ -13,10 +13,16 @@ YEAR_TO_DATE_YIELD on all 6,433 fund-years where both exist: the largest
 disagreement is 0.005 pp, i.e. rounding. Only fund-years with all 12 months
 present count as a complete annual return.
 
-`category` = FUND_CLASSIFICATION | risk level. That is the comparison group:
-a saver picks a family (study fund / provident / investment provident) and a
-risk level, and the funds inside that cell are the ones actually competing for
-the same money. Risk levels come from build_risk_levels.py.
+`category` = the fund's מסלול ממופה track, from build_track_map.py. That is the
+comparison group: a saver picks a track, and the funds inside it hold roughly
+the same thing, so ranking within a track never rewards a fund merely for
+carrying more equity than its rivals. Grouping on the track alone rather than
+on family x track keeps the cells large - 95% of track-years clear the 8-fund
+minimum, against 81% when family is crossed in - and a מניות track holds the
+same assets whether it is wrapped as a study fund or a provident fund.
+
+`risk_level` is still carried per fund (from build_risk_levels.py) because the
+risk-control stage uses it, but it no longer defines the comparison group.
 """
 import csv
 import os
@@ -25,6 +31,7 @@ from collections import defaultdict
 from source import HERE, FAMILIES, RISK_ORDER, iter_data, num
 
 RISK_LEVELS_CSV = os.path.join(HERE, "fund_risk_levels.csv")
+TRACK_MAP_CSV = os.path.join(HERE, "fund_track_map.csv")
 
 
 def load_risk_levels():
@@ -36,8 +43,19 @@ def load_risk_levels():
         }
 
 
+def load_tracks():
+    """fund_id -> (track, specialization, sub_specialization)."""
+    with open(TRACK_MAP_CSV, encoding="utf-8-sig") as fh:
+        return {
+            r["FUND_ID"]: (r["מסלול ממופה"], r["SPECIALIZATION"],
+                           r["SUB_SPECIALIZATION"])
+            for r in csv.DictReader(fh)
+        }
+
+
 def main():
     levels = load_risk_levels()
+    tracks = load_tracks()
     # (fund_id, year) -> accumulated months
     acc = defaultdict(lambda: {"months": {}, "name": None, "cls": None})
     fields = ["FUND_ID", "FUND_CLASSIFICATION", "MONTHLY_YIELD"]
@@ -64,17 +82,18 @@ def main():
             months = d["months"]
             if not months:
                 continue
-            risk, spec, sub = levels.get(fid, ("", "", ""))
-            # A fund with no resolvable risk level has no comparison group.
-            if risk not in RISK_ORDER:
+            track, spec, sub = tracks.get(fid, ("", "", ""))
+            # A fund with no resolvable track has no comparison group.
+            if not track:
                 continue
+            risk = levels.get(fid, ("", "", ""))[0]
             comp = 1.0
             for m in range(1, 13):
                 if m in months:
                     comp *= (1 + months[m] / 100.0)
             annual = (comp - 1) * 100.0
             w.writerow(["gemel", fid, d["name"], d["cls"], spec, sub, risk,
-                        f'{d["cls"]} | {risk}', year, round(annual, 4), len(months)])
+                        track, year, round(annual, 4), len(months)])
             written += 1
     print(f"wrote {out_path}  ({written} fund-years)")
 
